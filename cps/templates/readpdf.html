@@ -1,0 +1,1593 @@
+<!DOCTYPE html>
+<html lang="{{ current_user.locale }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="color-scheme" content="light dark">
+    <title>{{ title }}</title>
+    
+    <script src="{{ url_for('static', filename='js/libs/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pdf.min.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pdf_viewer.min.css') }}">
+
+    <style>
+        body {
+            margin: 0; padding: 0; overflow: hidden; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            transition: background-color 0.3s ease;
+            background-color: #e9e9e9;
+        }
+
+        body.theme-light { background-color: #e9e9e9; }
+        body.theme-sepia { background-color: #d1c1a3; }
+        body.theme-dark { background-color: #121212; }
+        body.theme-slate { background-color: #1e1e2e; }
+
+        #reader-loading {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: #ffffff; z-index: 9999; display: flex;
+            justify-content: center; align-items: center; flex-direction: column;
+            transition: opacity 0.3s ease;
+        }
+        body.theme-dark #reader-loading, body.theme-slate #reader-loading { background: #121212; color: #ddd; }
+        body.theme-sepia #reader-loading { background: #f4ecd8; color: #5b4636; }
+        
+        .spinner {
+            border: 4px solid rgba(0,0,0,0.1); border-top: 4px solid #007bff;
+            border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- FLOATING UI TOOLBARS --- */
+        #reader-header {
+            position: fixed; top: 0; left: 0; right: 0; height: 50px;
+            background: rgba(255, 255, 255, 0.90); border-bottom: 1px solid rgba(0,0,0,0.1);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 15px; z-index: 1000; transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+        #reader-header.hidden { transform: translateY(-100%); }
+
+        #reader-footer {
+            position: fixed; bottom: 0; left: 0; right: 0; height: 100px; 
+            box-sizing: border-box; padding: 0 15px 40px 15px; 
+            background: rgba(255, 255, 255, 0.90); border-top: 1px solid rgba(0,0,0,0.1);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000; transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+        #reader-footer.hidden { transform: translateY(100%); }
+        
+        .header-btn {
+            background: none; border: none; font-size: 16px; font-weight: 500;
+            color: #007bff; cursor: pointer; text-decoration: none; padding: 5px 10px;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .header-btn svg { margin-bottom: 2px; transition: fill 0.2s ease; }
+        
+        .footer-btn {
+            background: none; border: none; padding: 5px 8px; margin: 0 2px;
+            color: #666; cursor: pointer; transition: color 0.2s ease, transform 0.1s;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .footer-btn:hover { color: #333; transform: scale(1.1); }
+        .footer-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+        .book-title {
+            font-size: 16px; font-weight: 600; color: #333;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 35vw;
+        }
+
+        /* --- IMMERSIVE VIEWER CONTAINER --- */
+        #viewer-wrapper {
+            position: absolute; top: 0; bottom: 0; left: 0; right: 0;
+            overflow-y: auto; overflow-x: auto; text-align: center;
+            padding: 15px 0; 
+        }
+        
+        #pdf-layout-container {
+            display: flex; justify-content: center; align-items: flex-start; gap: 10px;
+            min-width: min-content; margin: 0 auto;
+            transition: transform 0.3s ease; /* Smooth scooting animation */
+        }
+
+        .pdf-page-container { position: relative; box-shadow: 0 4px 20px rgba(0,0,0,0.15); background: white; flex-shrink: 0; }
+        
+        /* Fix for Safari Screenshots & Android Chromium: Invert ONLY the canvas and text, NOT the whole container! */
+        body.theme-dark .pdf-page-container, body.theme-slate .pdf-page-container { background: transparent; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
+        body.theme-dark .pdf-canvas, body.theme-dark .textLayer { filter: invert(1) hue-rotate(180deg); }
+        body.theme-slate .pdf-canvas, body.theme-slate .textLayer { filter: invert(0.85) hue-rotate(180deg) contrast(0.95); }
+        body.theme-sepia .pdf-canvas, body.theme-sepia .textLayer { filter: sepia(0.4) brightness(0.9); }
+        
+        .textLayer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.2; line-height: 1.0; }
+        .textLayer ::selection { background: rgb(0,0,255); }
+
+        .highlight-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 5; }
+        
+        .pdf-highlight { position: absolute; pointer-events: auto; cursor: pointer; border-radius: 0; background: transparent !important; }
+
+        .link-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 4; }
+        .pdf-internal-link { position: absolute; pointer-events: auto; cursor: pointer; border-radius: 2px; }
+        .pdf-internal-link:hover { background: rgba(0, 123, 255, 0.1); }
+
+        .dog-ear-zone {
+            position: absolute; top: 0; width: 80px; height: 120px;
+            z-index: 60; cursor: pointer;
+        }
+        #page-left .dog-ear-zone { left: 0; }
+        #page-right .dog-ear-zone { right: 0; }
+
+        .dog-ear {
+            position: absolute; top: 0; width: 45px; height: 45px;
+            transition: opacity 0.2s ease; opacity: 0; pointer-events: none;
+        }
+        .dog-ear-zone:hover .dog-ear { opacity: 0.5; }
+        .pdf-page-container.is-bookmarked .dog-ear { opacity: 1 !important; }
+
+        #page-right .dog-ear {
+            right: 0; background: linear-gradient(225deg, transparent 50%, #f4f4f4 50%, #e0e0e0 100%);
+            box-shadow: -2px 2px 5px rgba(0,0,0,0.2);
+        }
+        #page-left .dog-ear {
+            left: 0; background: linear-gradient(135deg, transparent 50%, #f4f4f4 50%, #e0e0e0 100%);
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* --- VISUAL NAV BUTTONS --- */
+        .nav-btn {
+            position: fixed; top: 50%; transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.85); border: 1px solid rgba(0,0,0,0.1); 
+            border-radius: 50%; width: 48px; height: 48px; font-size: 20px; color: #444;
+            cursor: pointer; z-index: 100; display: flex;
+            justify-content: center; align-items: center; transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4); 
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        }
+        .nav-btn:hover { background: #fff; color: #000; transform: translateY(-50%) scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+        .nav-btn:disabled { opacity: 0.2; cursor: not-allowed; pointer-events: none; }
+        #btn-prev { left: 20px; }
+        #btn-next { right: 20px; }
+
+        /* --- INVISIBLE NAV TAP ZONES --- */
+        .tap-zone {
+            position: fixed; top: 70px; bottom: 100px; width: 25%; z-index: 50;
+            cursor: pointer; display: none; 
+            -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            outline: none;
+        }
+        #tap-zone-left { left: 0; }
+        #tap-zone-right { right: 0; }
+
+        #toc-menu {
+            position: fixed; top: 50px; left: -400px; bottom: 100px; width: 400px;
+            background: #f9f9f9; border-right: 1px solid #ddd; z-index: 999;
+            transition: left 0.3s ease; box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            display: flex; flex-direction: column;
+        }
+        #toc-menu.open { left: 0; }
+        
+        .sidebar-tabs { display: flex; border-bottom: 1px solid #ddd; background: #eee; flex-shrink: 0; }
+        .tab-btn { flex: 1; padding: 12px 5px; border: none; background: transparent; cursor: pointer; font-size: 13px; font-weight: 600; color: #666; outline: none; transition: all 0.2s ease; }
+        .tab-btn.active { background: #fff; color: #007bff; border-bottom: 2px solid #007bff; }
+        .tab-content { display: none; flex: 1; overflow-y: auto; padding: 10px 0; }
+        .tab-content.active { display: block; }
+
+        .toc-list { list-style: none; padding: 0; margin: 0; }
+        .toc-list li { border-bottom: 1px solid #eee; position: relative; }
+        .toc-list a { display: block; padding: 8px 20px; color: #333; text-decoration: none; font-size: 14px; line-height: 1.4; }
+        .toc-list a:hover { background: #f0f0f0; }
+        .btn-delete-ann { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #dc3545; font-size: 18px; cursor: pointer; opacity: 0.5; transition: opacity 0.2s; }
+        .btn-delete-ann:hover { opacity: 1; }
+
+        /* --- THUMBNAIL GRID --- */
+        #thumbnail-grid { display: grid; gap: 15px; padding: 15px; }
+        #thumbnail-grid.layout-single { grid-template-columns: repeat(1, 1fr); padding: 15px 50px; } /* Single column, larger thumbs */
+        #thumbnail-grid.layout-spread { grid-template-columns: repeat(2, 1fr); }
+        
+        /* The Offset Magic for Book Mode */
+        #thumbnail-grid.layout-book .thumb-container[data-page="1"] { grid-column-start: 2; }
+
+        .thumb-container { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+        .thumb-canvas-wrapper { width: 100%; aspect-ratio: 1 / 1.4; background: #e0e0e0; display: flex; justify-content: center; align-items: center; border: 2px solid transparent; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: transform 0.2s, border-color 0.2s; overflow: hidden; }
+        .thumb-canvas { max-width: 100%; max-height: 100%; background: white; opacity: 0; transition: opacity 0.3s ease; }
+        .thumb-container:hover .thumb-canvas-wrapper:not(.active-thumb) { transform: scale(1.05); border-color: #007bff; }
+        .thumb-label { font-size: 12px; color: #666; margin-top: 5px; font-weight: bold; }
+
+        /* --- ACTIVE THUMBNAIL HIGHLIGHTS --- */
+        .thumb-canvas-wrapper.active-thumb { 
+            border: 3px solid #007bff !important; 
+            position: relative; 
+            overflow: visible; 
+        }
+        
+        /* Spread Highlight Overrides: Make individual borders invisible to keep layout stable */
+        .layout-spread .thumb-canvas-wrapper.active-thumb-left,
+        .layout-spread .thumb-canvas-wrapper.active-thumb-right {
+            border-color: transparent !important; 
+        }
+        
+        /* The Master Frame: One single continuous border around both boxes */
+        .layout-spread .thumb-canvas-wrapper.active-thumb-left::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            /* 100% (Left Box) + 15px (Grid Gap) + 100% (Right Box) + 6px (To cover left/right border offsets) */
+            width: calc(200% + 21px); 
+            height: calc(100% + 6px);
+            border: 3px solid #007bff;
+            box-sizing: border-box;
+            border-radius: 2px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        /* Theme Support for Thumbnails */
+        body.theme-dark .thumb-canvas-wrapper, body.theme-slate .thumb-canvas-wrapper { background: #333; border-color: #444; }
+        body.theme-dark .thumb-canvas { filter: invert(1) hue-rotate(180deg); }
+        body.theme-slate .thumb-canvas { filter: invert(0.85) hue-rotate(180deg) contrast(0.95); }
+        body.theme-sepia .thumb-canvas { filter: sepia(0.4) brightness(0.9); }
+
+        #settings-menu {
+            position: fixed; top: 60px; right: 15px; width: 310px;
+            background: #fff; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 15px; z-index: 1001; display: none; border: 1px solid #eee;
+        }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .setting-row:last-child { margin-bottom: 0; }
+        .setting-label { font-size: 14px; color: #555; font-weight: 600; }
+        .setting-note { font-size: 12px; color: #888; font-weight: normal; font-style: italic; }
+        /* Explicitly set text and background color to override Safari defaults */
+        .font-btn { background: #fff; color: #333; border: 1px solid #ccc; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-left: 5px; }
+        select.font-btn { padding: 5px; width: 140px; } 
+
+        /* Custom Radio Buttons */
+        .radio-label { font-size: 13px; color: #555; display: flex; align-items: center; margin-bottom: 8px; cursor: pointer; }
+        body.theme-dark .radio-label, body.theme-slate .radio-label { color: #aaa; }
+
+        #highlight-toolbar {
+            display: none; position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
+            background: #222; padding: 12px 24px; border-radius: 30px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 2000; align-items: center; gap: 15px;
+        }
+        .color-btn { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; cursor: pointer; transition: transform 0.1s; }
+        .color-btn:hover { transform: scale(1.1); }
+        
+        /* Locked to Maximum Saturation */
+        .color-btn[data-color="yellow"] { background: #ffff00; }
+        .color-btn[data-color="green"] { background: #00ff00; }
+        .color-btn[data-color="red"] { background: #ff0000; }
+        .color-btn[data-color="blue"] { background: #0000ff; }
+
+        #annotation-modal {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 5px 30px rgba(0,0,0,0.3);
+            z-index: 2001; width: 320px;
+        }
+        #ann-text { font-style: italic; font-size: 14px; color: #666; max-height: 100px; overflow-y: auto; margin-bottom: 15px; padding-left: 10px; border-left: 3px solid #ccc; }
+        
+        /* Keep all modal buttons at 100% saturation, use border and scale to show selection */
+        .modal-color-btn { opacity: 1 !important; border: 2px solid #ccc; transition: transform 0.2s, border-color 0.2s; }
+        .modal-color-btn.selected { border-color: #333; transform: scale(1.25) !important; }
+        body.theme-dark .modal-color-btn.selected, body.theme-slate .modal-color-btn.selected { border-color: #fff; }
+        
+        /* Explicitly set light mode colors to override OS defaults */
+        #ann-note { width: 100%; height: 80px; margin-bottom: 15px; font-family: inherit; padding: 8px; border: 1px solid #ccc; border-radius: 4px; resize: none; background: #fff; color: #333; }
+        .modal-btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        #btn-ann-delete { background: #dc3545; color: white; }
+        #btn-ann-cancel { background: #e0e0e0; color: #333; margin-right: 5px; }
+        #btn-ann-save { background: #007bff; color: white; }
+
+        /* --- SLIDER & SCROLLBAR --- */
+        #slider-wrapper {
+            flex: 1; position: relative; height: 40px; 
+            margin: 0 10px; display: flex; align-items: center; 
+        }
+
+        #progress-slider { 
+            -webkit-appearance: none; width: 100%; height: 6px; 
+            background: #ddd; border-radius: 3px; outline: none; z-index: 1; 
+            touch-action: none; margin: 0; padding: 0;
+        }
+        #progress-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 8px; height: 24px; border-radius: 4px; background: #007bff; cursor: pointer; position: relative; z-index: 5; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        #progress-slider:disabled { opacity: 0.5; cursor: wait; }
+        #tick-marks-container { position: absolute; top: 0; left: 0; right: 0; height: 100%; pointer-events: none; z-index: 2; }
+        .tick-mark { position: absolute; top: 6px; width: 8px; height: 8px; border-radius: 50%; transform: translateX(-50%); box-shadow: 0 1px 2px rgba(0,0,0,0.3); opacity: 1 !important; }
+        .tick-mark-bookmark { position: absolute; top: 14px; width: 3px; height: 6px; background-color: #555; border-radius: 1px; transform: translateX(-50%); z-index: 1; }
+
+        #page-indicator { font-size: 13px; font-weight: 600; color: #666; min-width: 65px; text-align: center; margin: 0 10px 0 5px; font-variant-numeric: tabular-nums; }
+
+        /* --- ANNOTATION LOADING OVERLAY --- */
+        #annotation-loading-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.85); z-index: 2000;
+            display: flex; justify-content: center; align-items: center;
+            padding-top: 20px; /* Pushes the text safely away from the top edge */
+            padding-bottom: 40px; /* Keeps it visually balanced over the slider */
+            box-sizing: border-box; 
+            font-size: 13px; font-weight: bold; color: #555;
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        }
+        /* Theme Support */
+        body.theme-dark #annotation-loading-overlay, body.theme-slate #annotation-loading-overlay {
+            background: rgba(30, 30, 30, 0.85); color: #aaa;
+        }
+        body.theme-sepia #annotation-loading-overlay {
+            background: rgba(244, 236, 216, 0.85); color: #7b6656;
+        }
+        
+        /* --- THEME OVERRIDES --- */
+        body.theme-dark #reader-header, body.theme-dark #reader-footer, body.theme-slate #reader-header, body.theme-slate #reader-footer { background: rgba(30, 30, 30, 0.85); border-color: rgba(255,255,255,0.1); }
+        body.theme-dark .book-title, body.theme-slate .book-title { color: #ddd; }
+        body.theme-dark #toc-menu, body.theme-slate #toc-menu { background: #1e1e1e; border-color: #333; }
+        body.theme-dark .toc-list a, body.theme-slate .toc-list a { color: #ccc; }
+        body.theme-dark .toc-list li, body.theme-slate .toc-list li { border-bottom-color: #333; }
+        body.theme-dark .toc-list a:hover, body.theme-slate .toc-list a:hover { background: #2a2a2a; }
+        body.theme-dark .sidebar-tabs, body.theme-slate .sidebar-tabs { background: #222; border-bottom-color: #333; }
+        body.theme-dark .tab-btn, body.theme-slate .tab-btn { color: #aaa; }
+        body.theme-dark .tab-btn.active, body.theme-slate .tab-btn.active { background: #1e1e1e; color: #45b29d; border-bottom-color: #45b29d; }
+        body.theme-dark #settings-menu, body.theme-slate #settings-menu { background: #222; border-color: #333; }
+        body.theme-dark .setting-label, body.theme-slate .setting-label { color: #aaa; }
+        body.theme-dark .theme-btn, body.theme-dark .font-btn, body.theme-slate .theme-btn, body.theme-slate .font-btn { background: #333; border-color: #444; color: #ddd; }
+        body.theme-dark .nav-btn, body.theme-slate .nav-btn { background: rgba(40, 40, 40, 0.85); border-color: rgba(255,255,255,0.1); color: #ddd; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
+        body.theme-dark .nav-btn:hover, body.theme-slate .nav-btn:hover { background: #555; color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,0.8); }
+        body.theme-dark #annotation-modal, body.theme-slate #annotation-modal { background: #222; color: #ddd; }
+        body.theme-dark #ann-note, body.theme-slate #ann-note { background: #333; color: #fff; border-color: #555; }
+        body.theme-dark #btn-ann-cancel, body.theme-slate #btn-ann-cancel { background: #444; color: #ddd; }
+        body.theme-dark #progress-slider, body.theme-slate #progress-slider { background: #555; }
+        body.theme-dark .footer-btn, body.theme-slate .footer-btn { color: #aaa; }
+        body.theme-dark .footer-btn:hover, body.theme-slate .footer-btn:hover { color: #fff; }
+        body.theme-dark .tick-mark-bookmark, body.theme-slate .tick-mark-bookmark { background-color: #999; }
+        body.theme-dark #page-indicator, body.theme-slate #page-indicator { color: #aaa; }
+
+        body.theme-sepia #reader-header, body.theme-sepia #reader-footer { background: rgba(244, 236, 216, 0.90); border-color: rgba(91, 70, 54, 0.1); }
+        body.theme-sepia #toc-menu { background: #fcf8f2; border-right-color: #e0d5ba; }
+        body.theme-sepia .toc-list li { border-bottom-color: #e0d5ba; }
+        body.theme-sepia .toc-list a:hover { background: #f4ecd8; }
+        body.theme-sepia .sidebar-tabs { background: #e8dcc3; border-bottom-color: #d1c1a3; }
+        body.theme-sepia .tab-btn { color: #7b6656; }
+        body.theme-sepia .tab-btn.active { background: #fcf8f2; color: #d35400; border-bottom-color: #d35400; }
+        body.theme-sepia #settings-menu { background: #fcf8f2; border-color: #e0d5ba; }
+        body.theme-sepia .nav-btn { background: rgba(244, 236, 216, 0.9); border-color: rgba(91, 70, 54, 0.1); color: #5b4636; box-shadow: 0 4px 15px rgba(91, 70, 54, 0.2); }
+        body.theme-sepia .nav-btn:hover { background: #fff; color: #333; box-shadow: 0 6px 20px rgba(91, 70, 54, 0.3); }
+        body.theme-sepia #progress-slider { background: #d1c1a3; }
+        body.theme-sepia .footer-btn { color: #7b6656; }
+        body.theme-sepia .footer-btn:hover { color: #5b4636; }
+        body.theme-sepia #page-indicator { color: #7b6656; }
+
+        /* --- FORMAT WARNING MODAL --- */
+        #format-warning-modal {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.75); z-index: 10005; 
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        }
+        .warning-box {
+            background: #fff; padding: 30px; border-radius: 12px; max-width: 350px;
+            text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .warning-icon { font-size: 48px; margin-bottom: 10px; line-height: 1; }
+        .warning-box h3 { margin-top: 0; color: #333; font-weight: bold; margin-bottom: 15px; }
+        .warning-box p { margin-bottom: 25px; line-height: 1.5; color: #555; font-size: 15px; }
+        .warning-btn { padding: 12px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; transition: transform 0.1s; }
+        .warning-btn:active { transform: scale(0.95); }
+        #btn-warning-cancel { background: #e0e0e0; color: #333; }
+        #btn-warning-proceed { background: #d9534f; color: white; }
+
+        /* Dark Theme Overrides */
+        body.theme-dark .warning-box, body.theme-slate .warning-box { background: #222; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        body.theme-dark .warning-box h3, body.theme-slate .warning-box h3 { color: #eee; }
+        body.theme-dark .warning-box p, body.theme-slate .warning-box p { color: #aaa; }
+        body.theme-dark #btn-warning-cancel, body.theme-slate #btn-warning-cancel { background: #444; color: #ddd; }
+    </style>
+</head>
+<body class="theme-light">
+
+    <div id="cw-reader-data" 
+         data-settings="{{ bookmark.bookmark | forceescape if bookmark and bookmark.bookmark else '' }}" 
+         data-location="{{ saved_location | forceescape if saved_location else '' }}" 
+         style="display: none;"></div>
+
+    <div id="reader-loading">
+        <div class="spinner"></div>
+        <p style="margin-top: 15px; font-weight: bold;">Loading PDF...</p>
+    </div>
+
+    <div id="reader-header">
+        <div>
+            <button id="btn-close" class="header-btn">Close</button>
+            <button id="btn-toc" class="header-btn" style="margin-left: 10px;">☰ Menu</button>
+        </div>
+        <div class="book-title">{{ title }}</div>
+        <div>
+            <button id="btn-bookmark" class="header-btn" title="Bookmark Page" style="margin-right: 5px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </button>
+            <button id="btn-settings" class="header-btn">Aa</button>
+        </div>
+    </div>
+
+    <div id="reader-footer">
+        <div id="annotation-loading-overlay">Retrieving Annotation & Bookmark Data. Please Wait...</div>
+        
+        <button id="btn-jump-start" class="footer-btn" title="Beginning of Book">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 6v12h2V6H7zm10 12l-8-6 8-6v12z"/></svg>
+        </button>
+        <button id="btn-prev-ann" class="footer-btn" title="Previous Note/Bookmark">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M15 18l-8-6 8-6v12z"/></svg>
+        </button>
+        
+        <div id="slider-wrapper">
+            <div id="tick-marks-container"></div>
+            <input type="range" id="progress-slider" min="1" max="100" step="1" value="1">
+        </div>
+        
+        <div id="page-indicator">1 / ?</div>
+        
+        <button id="btn-next-ann" class="footer-btn" title="Next Note/Bookmark">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18l8-6-8-6v12z"/></svg>
+        </button>
+        <button id="btn-jump-end" class="footer-btn" title="End of Book">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 18l8-6-8-6v12zm8-12v12h2V6h-2z"/></svg>
+        </button>
+    </div>
+
+    <div id="viewer-wrapper">
+        <div id="pdf-layout-container">
+            <div id="page-left" class="pdf-page-container" style="display: none;">
+                <canvas class="pdf-canvas"></canvas>
+                <div class="textLayer"></div>
+                <div class="highlight-layer"></div>
+                <div class="link-layer"></div>
+                <div class="dog-ear-zone" data-side="left"><div class="dog-ear"></div></div>
+            </div>
+            <div id="page-right" class="pdf-page-container" style="display: none;">
+                <canvas class="pdf-canvas"></canvas>
+                <div class="textLayer"></div>
+                <div class="highlight-layer"></div>
+                <div class="link-layer"></div>
+                <div class="dog-ear-zone" data-side="right"><div class="dog-ear"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <button id="btn-prev" class="nav-btn">❮</button>
+    <button id="btn-next" class="nav-btn">❯</button>
+
+    <div id="tap-zone-left" class="tap-zone"></div>
+    <div id="tap-zone-right" class="tap-zone"></div>
+
+    <div id="toc-menu">
+        <div class="sidebar-tabs">
+            <button class="tab-btn active" data-target="tab-toc">Contents</button>
+            <button class="tab-btn" data-target="tab-thumbnails">Pages</button>
+            <button class="tab-btn" data-target="tab-bookmarks">Bookmarks</button>
+            <button class="tab-btn" data-target="tab-highlights">Notes</button>
+        </div>
+        <div id="tab-toc" class="tab-content active"><ul class="toc-list" id="toc-list-container"></ul></div>
+        <div id="tab-thumbnails" class="tab-content"><div id="thumbnail-grid"></div></div>
+        <div id="tab-bookmarks" class="tab-content"><ul class="toc-list" id="bookmarks-list-container"></ul></div>
+        <div id="tab-highlights" class="tab-content"><ul class="toc-list" id="highlights-list-container"></ul></div>
+    </div>
+
+    <div id="settings-menu">
+        <div class="setting-row" style="flex-direction: column; align-items: flex-start;">
+            <label class="radio-label" style="font-weight: bold; margin-bottom: 15px;">
+                <input type="checkbox" id="force-single-check" style="margin-right: 8px;"> Use Single Page Layout in Landscape Mode
+            </label>
+            
+            <span class="setting-label layout-option" style="margin-bottom: 8px; transition: opacity 0.2s;">Two-Page Layout:</span>
+            <label class="radio-label layout-option" style="transition: opacity 0.2s;">
+                <input type="radio" name="layout-radio" value="odd" style="margin-right: 8px;"> Book Mode (Cover is Single Page)
+            </label>
+            <label class="radio-label layout-option" style="margin-bottom: 0; transition: opacity 0.2s;">
+                <input type="radio" name="layout-radio" value="even" style="margin-right: 8px;"> Continuous Mode (Odd Pages on Left)
+            </label>
+        </div>
+        <div style="border-top: 1px solid #eee; margin: 15px 0;"></div>
+        <div class="setting-row">
+            <span class="setting-label">Theme</span>
+            <select class="font-btn" id="theme-select" style="width:140px;">
+                <option value="auto">Auto (System)</option>
+                <option value="light">Light</option>
+                <option value="sepia">Sepia</option>
+                <option value="slate">Slate (Low Contrast)</option>
+                <option value="dark">Dark</option>
+            </select>
+        </div>
+        <div class="setting-row">
+            <span class="setting-label">Navigation*</span>
+            <select class="font-btn" id="nav-mode-select" style="width:140px;">
+                <option value="tap">Edge Tap Zones</option>
+                <option value="buttons">Floating Buttons</option>
+            </select>
+        </div>
+        <div class="setting-row" style="margin-top: -10px;">
+            <span class="setting-note">*Use Floating Buttons when highlighting text</span>
+        </div>
+    </div>
+
+    <div id="highlight-toolbar">
+        <span style="color: white; font-size: 14px; font-weight: bold;">Highlight:</span>
+        <button class="color-btn" data-color="yellow"></button>
+        <button class="color-btn" data-color="green"></button>
+        <button class="color-btn" data-color="red"></button>
+        <button class="color-btn" data-color="blue"></button>
+        <button id="btn-hl-cancel" style="background: transparent; border: 1px solid #777; color: #ccc; border-radius: 15px; padding: 4px 10px; cursor: pointer;">Cancel</button>
+    </div>
+
+    <div id="annotation-modal">
+        <h4 style="margin-top: 0; margin-bottom: 15px;">Note</h4>
+        <div id="ann-text"></div>
+        <div id="ann-colors" style="margin-bottom: 15px; display: flex; gap: 10px; justify-content: center;">
+            <button class="color-btn modal-color-btn" data-color="yellow" style="position: static; transform: none;"></button>
+            <button class="color-btn modal-color-btn" data-color="green" style="position: static; transform: none;"></button>
+            <button class="color-btn modal-color-btn" data-color="red" style="position: static; transform: none;"></button>
+            <button class="color-btn modal-color-btn" data-color="blue" style="position: static; transform: none;"></button>
+        </div>
+        <textarea id="ann-note" placeholder="Add a personal note to this highlight..."></textarea>
+        <div style="display: flex; justify-content: space-between;">
+            <button id="btn-ann-delete" class="modal-btn">Delete</button>
+            <div>
+                <button id="btn-ann-cancel" class="modal-btn">Cancel</button>
+                <button id="btn-ann-save" class="modal-btn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        $.ajaxSetup({
+            beforeSend: function(xhr, settings) {
+                if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                    xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token() }}");
+                }
+            }
+        });
+
+        var pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "{{ url_for('static', filename='js/pdf.worker.min.js') }}";
+
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        $(document).ready(function() {
+            var localKey = "cw_settings_pdf_{{ pdffile }}";
+            var $dataNode = $('#cw-reader-data');
+            var rawDbSettings = $dataNode.data('settings');
+            var currentLocationStr = $dataNode.attr('data-location');   
+            
+            // New Streamlined Defaults
+            var readerSettings = { navMode: 'tap', theme: 'auto', layout: 'odd', forceSingleLandscape: false };
+            
+            try {
+                if (rawDbSettings && rawDbSettings !== "None" && rawDbSettings !== "") {
+                    var tempSettings = typeof rawDbSettings === 'string' ? JSON.parse(rawDbSettings) : rawDbSettings;
+                    if (typeof tempSettings === 'object' && tempSettings !== null) { Object.assign(readerSettings, tempSettings); }
+                } else {
+                    var localStr = localStorage.getItem(localKey);
+                    if (localStr) Object.assign(readerSettings, JSON.parse(localStr));
+                }
+            } catch(e) { console.warn("[DEBUG] Settings Parse Error:", e); }
+
+            // Upgrade legacy settings seamlessly
+            if (readerSettings.layout === 'auto-odd' || readerSettings.layout === 'single') readerSettings.layout = 'odd';
+            if (readerSettings.layout === 'auto-even') readerSettings.layout = 'even';
+
+            // --- THEME ENGINE ---
+            function applyTheme() {
+                var activeTheme = readerSettings.theme;
+                if (activeTheme === 'auto') {
+                    activeTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+                }
+                $('body').removeClass('theme-light theme-dark theme-sepia theme-slate theme-auto').addClass('theme-' + activeTheme);
+            }
+            
+            applyTheme();
+            
+            if (window.matchMedia) {
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+                    if (readerSettings.theme === 'auto') applyTheme();
+                });
+            }
+
+            $('#theme-select').val(readerSettings.theme);
+            $('#nav-mode-select').val(readerSettings.navMode);
+            $('input[name="layout-radio"][value="' + readerSettings.layout + '"]').prop('checked', true);
+
+            // --- NEW: Apply Checkbox State & Gray-Out ---
+            $('#force-single-check').prop('checked', readerSettings.forceSingleLandscape);
+            if (readerSettings.forceSingleLandscape) {
+                $('.layout-option').css('opacity', '0.4');
+                $('input[name="layout-radio"]').prop('disabled', true);
+            }
+            
+            // --- DYNAMIC LAYOUT ENGINE ---
+            function getEffectiveLayout() {
+                // Check master override first
+                if (readerSettings.forceSingleLandscape) {
+                    return 'single'; 
+                }
+                
+                var isLandscape = window.innerWidth > window.innerHeight && window.innerWidth > 700;
+                if (isLandscape) {
+                    return readerSettings.layout; // 'odd' or 'even'
+                }
+                return 'single'; // Automatically fallback to single on portrait
+            }
+
+            applyNavMode();
+
+            function applyNavMode() {
+                if (readerSettings.navMode === 'tap') {
+                    $('.nav-btn').hide();
+                    $('.tap-zone').show();
+                } else {
+                    $('.nav-btn').show();
+                    $('.tap-zone').hide();
+                }
+            }
+
+            var pdfDoc = null;
+            var pageNum = 1; 
+            var isRendering = false;
+            var pageNumPending = null;
+            
+            var loadedAnnotations = {}; 
+            var pendingHighlightData = null; 
+            var currentAnnotationId = null;
+
+            var tocDestinations = {};
+            var tocCounter = 0;
+            var mismatchDetected = false;
+
+            try {
+                if (currentLocationStr && currentLocationStr !== "None" && currentLocationStr !== "") {
+                    // SANITY CHECK: Did they last read the ePub?
+                    if (currentLocationStr.indexOf('cfi') !== -1 || currentLocationStr.indexOf('epub') !== -1) {
+                        mismatchDetected = true;
+                        currentLocationStr = ""; // Clear poison data so it safely loads Page 1 in the background
+                    } else {
+                        var parsedLoc = typeof currentLocationStr === 'string' ? JSON.parse(currentLocationStr) : currentLocationStr;
+                        if (parsedLoc && parsedLoc.page) {
+                            var parsedPage = parseInt(parsedLoc.page);
+                            if (!isNaN(parsedPage) && parsedPage > 0) pageNum = parsedPage;
+                        }
+                    }
+                }
+            } catch(e) { console.warn("[DEBUG] Location Parse Error:", e); }
+
+            var bookUrl = "{{ url_for('web.serve_book', book_id=pdffile, book_format='PDF', anyname='file.pdf') }}";
+
+            pdfjsLib.getDocument(bookUrl).promise.then(function(pdfDoc_) {
+                pdfDoc = pdfDoc_;
+                $('#progress-slider').attr('max', pdfDoc.numPages);
+                
+                pdfDoc.getOutline().then(function(outline) {
+                    var $list = $('#toc-list-container');
+                    if (!outline || outline.length === 0) {
+                        $list.html('<li><a href="#" style="padding-left:20px; color:#999; pointer-events:none;">No Table of Contents</a></li>');
+                    } else {
+                        $list.html(buildTocHtml(outline, 0));
+                    }
+                });
+                
+                initThumbnails(); // Initialize the lazy-loading grid
+                
+                $('#reader-loading').fadeOut();
+                updatePageIndicator(pageNum);
+                loadAnnotations(); 
+            });
+
+            function updatePageIndicator(basePage) {
+                if (!pdfDoc) return;
+                var total = pdfDoc.numPages;
+                var text = "";
+                var effectiveLayout = getEffectiveLayout();
+
+                if (effectiveLayout === 'single') {
+                    text = basePage + " / " + total;
+                } else {
+                    var leftPageNum = 0;
+                    var rightPageNum = 0;
+                    
+                    if (effectiveLayout === 'odd') {
+                        leftPageNum = (basePage % 2 === 0) ? basePage : basePage - 1;
+                        rightPageNum = leftPageNum + 1;
+                    } else if (effectiveLayout === 'even') {
+                        leftPageNum = (basePage % 2 !== 0) ? basePage : basePage - 1;
+                        rightPageNum = leftPageNum + 1;
+                    }
+
+                    var visible = [];
+                    if (leftPageNum >= 1 && leftPageNum <= total) visible.push(leftPageNum);
+                    if (rightPageNum >= 1 && rightPageNum <= total) visible.push(rightPageNum);
+
+                    if (visible.length === 2) {
+                        text = visible[0] + "-" + visible[1] + " / " + total;
+                    } else if (visible.length === 1) {
+                        text = visible[0] + " / " + total;
+                    } else {
+                        text = basePage + " / " + total; 
+                    }
+                }
+                $('#page-indicator').text(text);
+            }
+
+            function updateActiveThumbnails() {
+                $('.thumb-canvas-wrapper').removeClass('active-thumb active-thumb-left active-thumb-right');
+                var effectiveLayout = getEffectiveLayout();
+                var leftPageNum = 0;
+                var rightPageNum = 0;
+
+                if (effectiveLayout === 'single') {
+                    rightPageNum = pageNum;
+                } else if (effectiveLayout === 'odd') {
+                    leftPageNum = (pageNum % 2 === 0) ? pageNum : pageNum - 1;
+                    rightPageNum = leftPageNum + 1;
+                } else if (effectiveLayout === 'even') {
+                    leftPageNum = (pageNum % 2 !== 0) ? pageNum : pageNum - 1;
+                    rightPageNum = leftPageNum + 1;
+                }
+                
+                var $grid = $('#thumbnail-grid');
+                $grid.removeClass('layout-single layout-spread layout-book');
+                
+                if (effectiveLayout === 'single') {
+                    $grid.addClass('layout-single');
+                    $('.thumb-container[data-page="' + rightPageNum + '"] .thumb-canvas-wrapper').addClass('active-thumb');
+                } else {
+                    $grid.addClass('layout-spread');
+                    if (effectiveLayout === 'odd') $grid.addClass('layout-book');
+                    
+                    // Verify pages actually exist before bridging them
+                    var leftExists = leftPageNum > 0 && leftPageNum <= pdfDoc.numPages;
+                    var rightExists = rightPageNum > 0 && rightPageNum <= pdfDoc.numPages;
+
+                    if (leftExists && rightExists) {
+                        $('.thumb-container[data-page="' + leftPageNum + '"] .thumb-canvas-wrapper').addClass('active-thumb active-thumb-left');
+                        $('.thumb-container[data-page="' + rightPageNum + '"] .thumb-canvas-wrapper').addClass('active-thumb active-thumb-right');
+                    } else if (leftExists) {
+                        $('.thumb-container[data-page="' + leftPageNum + '"] .thumb-canvas-wrapper').addClass('active-thumb');
+                    } else if (rightExists) {
+                        $('.thumb-container[data-page="' + rightPageNum + '"] .thumb-canvas-wrapper').addClass('active-thumb');
+                    }
+                }
+            }
+
+            function initThumbnails() {
+                var $grid = $('#thumbnail-grid');
+                $grid.empty();
+                
+                // 1. Generate lightweight placeholders instantly
+                for (var i = 1; i <= pdfDoc.numPages; i++) {
+                    $grid.append(
+                        '<div class="thumb-container" data-page="' + i + '">' +
+                            '<div class="thumb-canvas-wrapper">' +
+                                '<canvas class="thumb-canvas"></canvas>' +
+                            '</div>' +
+                            '<div class="thumb-label">' + i + '</div>' +
+                        '</div>'
+                    );
+                }
+
+                // 2. Set up the intersection observer for lazy loading
+                var observer = new IntersectionObserver(function(entries) {
+                    entries.forEach(function(entry) {
+                        if (entry.isIntersecting) {
+                            var $container = $(entry.target);
+                            var pageNum = $container.data('page');
+                            var canvas = $container.find('.thumb-canvas')[0];
+                            
+                            if (!canvas.dataset.rendered) {
+                                canvas.dataset.rendered = "true"; // Prevent double-rendering
+                                
+                                pdfDoc.getPage(pageNum).then(function(page) {
+                                    var viewport = page.getViewport({ scale: 0.25 }); // Render at 25% scale for speed
+                                    canvas.width = viewport.width;
+                                    canvas.height = viewport.height;
+                                    var ctx = canvas.getContext('2d');
+                                    
+                                    page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function() {
+                                        canvas.style.opacity = 1; // Fade it in
+                                    });
+                                });
+                            }
+                        }
+                    });
+                }, { root: document.getElementById('tab-thumbnails'), rootMargin: '200px' }); // Start loading slightly before they scroll into view
+
+                // 3. Attach observer to all placeholders and add click events
+                $('.thumb-container').each(function() { observer.observe(this); });
+                
+                $('.thumb-container').on('click', function() {
+                    transitionToPage($(this).data('page'));
+                    if (window.innerWidth < 800) $('#toc-menu').removeClass('open');
+                });
+            }
+
+            function buildTocHtml(items, level) {
+                var html = '';
+                var indent = level * 15;
+                items.forEach(function(item) {
+                    var tocId = 'toc-' + (tocCounter++);
+                    tocDestinations[tocId] = item.dest; 
+                    html += '<li><a href="#" class="toc-link" data-tocid="' + tocId + '" style="padding-left: ' + (20 + indent) + 'px">' + escapeHtml(item.title) + '</a></li>';
+                    if (item.items && item.items.length > 0) {
+                        html += buildTocHtml(item.items, level + 1);
+                    }
+                });
+                return html;
+            }
+
+            function transitionToPage(newPage) {
+                if (newPage < 1 || newPage > pdfDoc.numPages || newPage === pageNum) return;
+                
+                if (isRendering) {
+                    pageNumPending = newPage;
+                    return;
+                }
+
+                pageNum = newPage;
+                renderView();
+                
+                // Update the Edge and Annotation navigation buttons
+                $('#btn-jump-start, #btn-prev').prop('disabled', pageNum <= 1);
+                $('#btn-jump-end, #btn-next').prop('disabled', pageNum >= pdfDoc.numPages);
+                if (typeof updateAnnButtons === 'function') updateAnnButtons();
+            }
+
+            function renderView() {
+                isRendering = true;
+                $('#highlight-toolbar').hide();
+                window.getSelection().removeAllRanges();
+
+                var leftPageNum = 0;
+                var rightPageNum = 0;
+                var effectiveLayout = getEffectiveLayout();
+
+                if (effectiveLayout === 'single') {
+                    rightPageNum = pageNum;
+                } else if (effectiveLayout === 'odd') {
+                    leftPageNum = (pageNum % 2 === 0) ? pageNum : pageNum - 1;
+                    rightPageNum = leftPageNum + 1;
+                } else if (effectiveLayout === 'even') {
+                    leftPageNum = (pageNum % 2 !== 0) ? pageNum : pageNum - 1;
+                    rightPageNum = leftPageNum + 1;
+                }
+
+                var p1 = renderSinglePage(leftPageNum, 'page-left');
+                var p2 = renderSinglePage(rightPageNum, 'page-right');
+
+                Promise.all([p1, p2]).then(function() {
+                    isRendering = false;
+                    syncProgress();
+                    updateBookmarkVisuals(); 
+
+                    if (pageNumPending !== null) {
+                        var next = pageNumPending;
+                        pageNumPending = null;
+                        transitionToPage(next);
+                    }
+                    
+                    adjustForUI();
+                });
+
+                $('#progress-slider').val(pageNum);
+                updatePageIndicator(pageNum);
+                updateActiveThumbnails(); // Sync thumbnails on page turn
+            }
+
+            function renderSinglePage(num, containerId) {
+                var containerBox = document.getElementById(containerId);
+                if (num < 1 || num > pdfDoc.numPages) {
+                    containerBox.style.display = 'none';
+                    containerBox.dataset.page = 0; 
+                    return Promise.resolve();
+                }
+                
+                containerBox.style.display = 'inline-block';
+                containerBox.dataset.page = num; 
+
+                return pdfDoc.getPage(num).then(function(page) {
+                    // Always dynamically calculate "fit" bounds
+                    var unscaled = page.getViewport({ scale: 1.0 });
+                    var wrapper = document.getElementById('viewer-wrapper');
+                    
+                    var availableHeight = wrapper.clientHeight - 20; 
+                    var availableWidth = wrapper.clientWidth - 40; 
+                    
+                    if (getEffectiveLayout() !== 'single') {
+                        availableWidth = (availableWidth - 10) / 2; 
+                    }
+                    
+                    var scale = Math.min(availableHeight / unscaled.height, availableWidth / unscaled.width);
+                    if (scale < 0.2) scale = 0.2;
+                    
+                    var viewport = page.getViewport({ scale: scale });
+
+                    var canvas = containerBox.querySelector('.pdf-canvas');
+                    var ctx = canvas.getContext('2d');
+                    
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    containerBox.style.width = viewport.width + 'px';
+                    containerBox.style.height = viewport.height + 'px';
+
+                    var renderContext = { canvasContext: ctx, viewport: viewport };
+                    return page.render(renderContext).promise.then(function() {
+                        return page.getTextContent();
+                    }).then(function(textContent) {
+                        var textLayerDiv = containerBox.querySelector('.textLayer');
+                        textLayerDiv.innerHTML = ''; 
+                        pdfjsLib.renderTextLayer({
+                            textContent: textContent,
+                            container: textLayerDiv,
+                            viewport: viewport,
+                            textDivs: []
+                        });
+
+                        drawHighlightsOnPage(num, containerBox);
+                        renderLinksOnPage(page, viewport, containerBox);
+                    });
+                });
+            }
+
+            function renderLinksOnPage(page, viewport, containerBox) {
+                var linkLayer = containerBox.querySelector('.link-layer');
+                linkLayer.innerHTML = '';
+                
+                page.getAnnotations().then(function(annotations) {
+                    annotations.forEach(function(ann) {
+                        if (ann.subtype === 'Link') {
+                            var rect = viewport.convertToViewportRectangle(ann.rect);
+                            var a = document.createElement('a');
+                            a.className = 'pdf-internal-link';
+                            
+                            var minX = Math.min(rect[0], rect[2]);
+                            var minY = Math.min(rect[1], rect[3]);
+                            var maxX = Math.max(rect[0], rect[2]);
+                            var maxY = Math.max(rect[1], rect[3]);
+
+                            a.style.left = minX + 'px';
+                            a.style.top = minY + 'px';
+                            a.style.width = (maxX - minX) + 'px';
+                            a.style.height = (maxY - minY) + 'px';
+
+                            a.onclick = function(e) {
+                                e.preventDefault();
+                                if (ann.url) window.open(ann.url, '_blank');
+                                else if (ann.dest) navigateToDest(ann.dest);
+                            };
+                            linkLayer.appendChild(a);
+                        }
+                    });
+                });
+            }
+
+            function navigateToDest(dest) {
+                if (typeof dest === 'string') {
+                    pdfDoc.getDestination(dest).then(function(destArray) {
+                        if(destArray) resolveDestArray(destArray);
+                    });
+                } else {
+                    resolveDestArray(dest);
+                }
+            }
+
+            function resolveDestArray(destArray) {
+                if (!destArray || destArray.length === 0) return;
+                var destRef = destArray[0];
+                
+                if (destRef !== null && typeof destRef === 'object') {
+                    pdfDoc.getPageIndex(destRef).then(function(pageIndex) {
+                        transitionToPage(pageIndex + 1);
+                    }).catch(function(e) {});
+                } else if (typeof destRef === 'number') {
+                    transitionToPage(destRef + 1);
+                }
+            }
+
+            $(document).on('click', '.toc-link', function(e) {
+                e.preventDefault();
+                var dest = tocDestinations[$(this).data('tocid')];
+                if (dest) {
+                    navigateToDest(dest);
+                    if (window.innerWidth < 800) $('#toc-menu').removeClass('open');
+                }
+            });
+
+            function onPrevPage() { 
+                var step = (getEffectiveLayout() === 'single') ? 1 : 2;
+                transitionToPage(pageNum - step);
+            }
+            
+            function onNextPage() { 
+                var step = (getEffectiveLayout() === 'single') ? 1 : 2;
+                transitionToPage(pageNum + step);
+            }
+
+            $('#btn-prev').on('click', onPrevPage);
+            $('#btn-next').on('click', onNextPage);
+            
+            $('#tap-zone-left').on('click', function(e) { e.stopPropagation(); onPrevPage(); });
+            $('#tap-zone-right').on('click', function(e) { e.stopPropagation(); onNextPage(); });
+
+            document.addEventListener('keyup', function(e) { 
+                if (e.key === "ArrowLeft") onPrevPage(); 
+                if (e.key === "ArrowRight") onNextPage(); 
+            });
+
+            function getSaturatedHexForColor(color) {
+                var fills = { 'yellow': '#ffff00', 'green': '#00ff00', 'red': '#ff0000', 'blue': '#0000ff' };
+                return fills[color] || fills['yellow'];
+            }
+
+            function loadAnnotations() {
+                $('#annotation-loading-overlay').css('display', 'flex'); // Show while loading
+                $.get("{{ url_for('web.get_annotations', book_id=pdffile, format='PDF') }}", function(data) {
+                    loadedAnnotations = {};
+                    data.forEach(function(ann) { loadedAnnotations[ann.id] = ann; });
+                    renderSidebarLists();
+                    renderTickMarks();
+                    renderView(); 
+                    if (typeof updateAnnButtons === 'function') updateAnnButtons();
+                    $('#annotation-loading-overlay').fadeOut('fast'); // Hide when done
+                });
+            }
+
+            function drawHighlightsOnPage(targetPageNum, containerBox) {
+                var hlLayer = containerBox.querySelector('.highlight-layer');
+                hlLayer.innerHTML = ''; 
+                
+                Object.values(loadedAnnotations).forEach(function(ann) {
+                    if (ann.color === 'bookmark') return;
+                    try {
+                        var cfiData = JSON.parse(ann.cfi);
+                        if (cfiData.page === targetPageNum && cfiData.rects) {
+                            cfiData.rects.forEach(function(rect) {
+                                var div = document.createElement('div');
+                                div.className = 'pdf-highlight';
+                                div.style.borderBottom = '3px solid ' + getSaturatedHexForColor(ann.color);
+                                div.style.backgroundColor = 'transparent';
+                                div.style.left = (rect.left * 100) + '%';
+                                div.style.top = (rect.top * 100) + '%';
+                                div.style.width = (rect.width * 100) + '%';
+                                div.style.height = (rect.height * 100) + '%';
+                                
+                                div.addEventListener('click', function(e) {
+                                    e.stopPropagation();
+                                    openAnnotationModal(ann.id);
+                                });
+                                hlLayer.appendChild(div);
+                            });
+                        }
+                    } catch(e) {} 
+                });
+            }
+
+            document.addEventListener('selectionchange', function() {
+                var selection = window.getSelection();
+                if (selection.rangeCount > 0 && selection.toString().trim().length > 0) {
+                    var leftC = document.getElementById('page-left');
+                    var rightC = document.getElementById('page-right');
+                    var activeContainer = null;
+
+                    if (leftC.style.display !== 'none' && leftC.contains(selection.anchorNode)) activeContainer = leftC;
+                    else if (rightC.style.display !== 'none' && rightC.contains(selection.anchorNode)) activeContainer = rightC;
+
+                    if (activeContainer) {
+                        var activePageNum = parseInt(activeContainer.dataset.page);
+                        var range = selection.getRangeAt(0);
+                        var containerRect = activeContainer.getBoundingClientRect();
+                        
+                        var mappedRects = [];
+                        
+                        // PRECISION HIGHLIGHTING: Iterate strictly through text nodes
+                        var treeWalker = document.createTreeWalker(activeContainer.querySelector('.textLayer'), NodeFilter.SHOW_TEXT, null, false);
+                        var node;
+                        while ((node = treeWalker.nextNode())) {
+                            if (!node.nodeValue || node.nodeValue.trim() === '') continue; // Skip layout padding nodes
+                            
+                            if (range.intersectsNode(node)) {
+                                var subRange = document.createRange();
+                                try {
+                                    subRange.selectNodeContents(node);
+                                    
+                                    // Bypass Android's element-anchor touch bug by dynamically clamping bounds
+                                    try {
+                                        if (range.compareBoundaryPoints(Range.START_TO_START, subRange) > 0) {
+                                            subRange.setStart(range.startContainer, range.startOffset);
+                                        }
+                                    } catch(e) {}
+                                    try {
+                                        if (range.compareBoundaryPoints(Range.END_TO_END, subRange) < 0) {
+                                            subRange.setEnd(range.endContainer, range.endOffset);
+                                        }
+                                    } catch(e) {}
+                                    
+                                    if (subRange.toString().trim() === '') continue; // Skip empty whitespace handles
+                                    
+                                    var nodeRects = subRange.getClientRects();
+                                    for (var i = 0; i < nodeRects.length; i++) {
+                                        // Ignore 0-width/height ghost rects
+                                        if (nodeRects[i].width > 0 && nodeRects[i].height > 0) {
+                                            mappedRects.push({
+                                                left: (nodeRects[i].left - containerRect.left) / containerRect.width,
+                                                top: (nodeRects[i].top - containerRect.top) / containerRect.height,
+                                                width: nodeRects[i].width / containerRect.width,
+                                                height: nodeRects[i].height / containerRect.height
+                                            });
+                                        }
+                                    }
+                                } catch(e) {}
+                            }
+                        }
+                        
+                        pendingHighlightData = {
+                            page: activePageNum,
+                            rects: mappedRects,
+                            text: selection.toString().trim()
+                        };
+                        $('#highlight-toolbar').css('display', 'flex');
+                    }
+                } else {
+                    $('#highlight-toolbar').hide();
+                }
+            });
+
+            $('.color-btn').on('click', function() {
+                var color = $(this).data('color');
+                if (pendingHighlightData) {
+                    var cfiString = JSON.stringify(pendingHighlightData);
+                    var textSnippet = pendingHighlightData.text.substring(0, 150);
+                    
+                    $.post("{{ url_for('web.save_annotation', book_id=pdffile) }}", {
+                        format: "PDF", cfi: cfiString, text: textSnippet,
+                        note: "", color: color, csrf_token: "{{ csrf_token() }}"
+                    }).done(function() { loadAnnotations(); }); 
+                    
+                    $('#highlight-toolbar').hide();
+                    window.getSelection().removeAllRanges();
+                    pendingHighlightData = null;
+                }
+            });
+
+            $('#btn-hl-cancel').on('click', function() {
+                $('#highlight-toolbar').hide();
+                window.getSelection().removeAllRanges();
+                pendingHighlightData = null;
+            });
+
+            function renderSidebarLists() {
+                var $bmList = $('#bookmarks-list-container');
+                var $hlList = $('#highlights-list-container');
+                $bmList.empty(); $hlList.empty();
+                
+                var sortedAnns = Object.values(loadedAnnotations).sort(function(a, b) {
+                    try { return JSON.parse(a.cfi).page - JSON.parse(b.cfi).page; } catch(e) { return 0; }
+                });
+                
+                sortedAnns.forEach(function(ann) {
+                    try {
+                        var targetPage = JSON.parse(ann.cfi).page;
+                        var li = '<li><a href="#" class="sidebar-ann-link" data-page="' + targetPage + '" style="padding-right: 40px;">';
+                        
+                        if (ann.color === 'bookmark') {
+                            li += '<strong>' + (ann.text || 'Page Bookmark') + '</strong>';
+                            li += '</a><button class="btn-delete-ann" data-id="' + ann.id + '" title="Delete">&times;</button></li>';
+                            $bmList.append(li);
+                        } else {
+                            var colorDot = '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:middle;background-color:'+ getSaturatedHexForColor(ann.color) +'"></span>';
+                            li += colorDot + '<span style="font-style:italic; color:#666;">"' + (ann.text ? ann.text.substring(0, 40) + '...' : '') + '"</span>';
+                            li += '<br><span style="font-size:12px; margin-left:20px; display:block; margin-top:4px;">Page ' + targetPage + (ann.note ? ' &bull; ' + ann.note : '') + '</span>';
+                            li += '</a><button class="btn-delete-ann" data-id="' + ann.id + '" title="Delete">&times;</button></li>';
+                            $hlList.append(li);
+                        }
+                    } catch(e) {}
+                });
+                
+                $('.sidebar-ann-link').on('click', function(e) {
+                    e.preventDefault();
+                    transitionToPage($(this).data('page'));
+                    if (window.innerWidth < 800) $('#toc-menu').removeClass('open'); 
+                });
+                
+                $('.btn-delete-ann').on('click', function(e) {
+                    e.preventDefault(); e.stopPropagation();
+                    var id = $(this).data('id');
+                    $.post("/ajax/delete_annotation/" + id, { csrf_token: "{{ csrf_token() }}" })
+                    .done(function() {
+                        delete loadedAnnotations[id];
+                        renderSidebarLists();
+                        renderTickMarks();
+                        updateBookmarkVisuals();
+                        drawHighlightsOnPage(parseInt($('#page-left').attr('data-page')), document.getElementById('page-left'));
+                        drawHighlightsOnPage(parseInt($('#page-right').attr('data-page')), document.getElementById('page-right'));
+                        if (typeof updateAnnButtons === 'function') updateAnnButtons();
+                    });
+                });
+            }
+
+            function renderTickMarks() {
+                if (!pdfDoc) return;
+                var $container = $('#tick-marks-container');
+                $container.empty();
+                
+                Object.values(loadedAnnotations).forEach(function(ann) {
+                    try {
+                        var targetPage = JSON.parse(ann.cfi).page;
+                        
+                        // Math fix: Slider thumbs map 0% to min (1), and 100% to max (numPages).
+                        var percentage = 0;
+                        if (pdfDoc.numPages > 1) {
+                            percentage = (targetPage - 1) / (pdfDoc.numPages - 1);
+                        }
+                        
+                        var offsetCalc = 'calc(' + (percentage * 100) + '% + ' + (4 - (percentage * 8)) + 'px)';
+
+                        if (ann.color === 'bookmark') {
+                            var tick = $('<div class="tick-mark-bookmark"></div>').css({ left: offsetCalc }).attr('title', 'Page ' + targetPage);
+                            $container.append(tick);
+                        } else {
+                            var tick = $('<div class="tick-mark"></div>').css({
+                                left: offsetCalc, backgroundColor: getSaturatedHexForColor(ann.color), zIndex: 2
+                            }).attr('title', 'Page ' + targetPage);
+                            $container.append(tick);
+                        }
+                    } catch(e) {}
+                });
+            }
+
+            function updateBookmarkVisuals() {
+                var leftPageNum = parseInt($('#page-left').attr('data-page')) || 0;
+                var rightPageNum = parseInt($('#page-right').attr('data-page')) || 0;
+                
+                var leftBookmarked = false;
+                var rightBookmarked = false;
+                var primaryBookmarked = false; 
+                
+                Object.values(loadedAnnotations).forEach(function(ann) {
+                    try {
+                        var cfiObj = JSON.parse(ann.cfi);
+                        if (ann.color === 'bookmark') {
+                            if (cfiObj.page === leftPageNum) leftBookmarked = true;
+                            if (cfiObj.page === rightPageNum) rightBookmarked = true;
+                            if (cfiObj.page === pageNum) primaryBookmarked = true;
+                        }
+                    } catch(e) {}
+                });
+                
+                if (leftBookmarked) $('#page-left').addClass('is-bookmarked');
+                else $('#page-left').removeClass('is-bookmarked');
+                
+                if (rightBookmarked) $('#page-right').addClass('is-bookmarked');
+                else $('#page-right').removeClass('is-bookmarked');
+                
+                $('#btn-bookmark svg').attr('fill', primaryBookmarked ? 'currentColor' : 'none');
+            }
+
+            function toggleBookmark(targetPage) {
+                if (!targetPage || targetPage < 1) return;
+                
+                var existingId = null;
+                Object.values(loadedAnnotations).forEach(function(ann) {
+                    try {
+                        var cfiObj = JSON.parse(ann.cfi);
+                        if (ann.color === 'bookmark' && cfiObj.page === targetPage) existingId = ann.id;
+                    } catch(e) {}
+                });
+                
+                if (existingId) {
+                    $.post("/ajax/delete_annotation/" + existingId, { csrf_token: "{{ csrf_token() }}" })
+                    .done(function() { loadAnnotations(); });
+                } else {
+                    var cfiString = JSON.stringify({ page: targetPage, type: 'bookmark' });
+                    $.post("{{ url_for('web.save_annotation', book_id=pdffile) }}", {
+                        format: "PDF", cfi: cfiString, text: "Page " + targetPage,
+                        note: "Bookmark", color: "bookmark", csrf_token: "{{ csrf_token() }}"
+                    }).done(function() { loadAnnotations(); });
+                }
+            }
+
+            $('#btn-bookmark').on('click', function() { toggleBookmark(pageNum); });
+            
+            $('.dog-ear-zone').on('click', function(e) {
+                e.stopPropagation(); 
+                var targetPage = parseInt($(this).closest('.pdf-page-container').attr('data-page'));
+                toggleBookmark(targetPage);
+            });
+
+            var modalSelectedColor = 'yellow';
+
+            function openAnnotationModal(id) {
+                var ann = loadedAnnotations[id];
+                if (ann) {
+                    currentAnnotationId = ann.id;
+                    $('#ann-text').text('"' + ann.text + '"');
+                    $('#ann-note').val(ann.note || "");
+                    
+                    if (ann.color === 'bookmark') {
+                        $('#ann-colors').hide();
+                    } else {
+                        $('#ann-colors').show();
+                        modalSelectedColor = ann.color || 'yellow';
+                        $('.modal-color-btn').removeClass('selected');
+                        $('.modal-color-btn[data-color="' + modalSelectedColor + '"]').addClass('selected');
+                    }
+                    
+                    $('#annotation-modal').show();
+                    $('#highlight-toolbar').hide(); 
+                }
+            }
+
+            $('.modal-color-btn').on('click', function() {
+                modalSelectedColor = $(this).data('color');
+                $('.modal-color-btn').removeClass('selected');
+                $(this).addClass('selected');
+            });
+
+            $('#btn-ann-cancel').on('click', function() { $('#annotation-modal').hide(); });
+
+            $('#btn-ann-delete').on('click', function() {
+                if (currentAnnotationId) {
+                    $.post("/ajax/delete_annotation/" + currentAnnotationId, { csrf_token: "{{ csrf_token() }}" })
+                    .done(function() {
+                        delete loadedAnnotations[currentAnnotationId];
+                        renderSidebarLists();
+                        renderTickMarks();
+                        updateBookmarkVisuals();
+                        drawHighlightsOnPage(parseInt($('#page-left').attr('data-page')), document.getElementById('page-left'));
+                        drawHighlightsOnPage(parseInt($('#page-right').attr('data-page')), document.getElementById('page-right'));
+                        $('#annotation-modal').hide();
+                    });
+                }
+            });
+
+            $('#btn-ann-save').on('click', function() {
+                var note = $('#ann-note').val();
+                var ann = loadedAnnotations[currentAnnotationId];
+                if (ann) {
+                    var finalColor = (ann.color === 'bookmark') ? 'bookmark' : modalSelectedColor;
+                    $.post("{{ url_for('web.save_annotation', book_id=pdffile) }}", {
+                        format: "PDF", cfi: ann.cfi, text: ann.text,
+                        note: note, color: finalColor, csrf_token: "{{ csrf_token() }}"
+                    }).done(function() {
+                        ann.note = note;
+                        ann.color = finalColor; // Update memory
+                        renderSidebarLists();
+                        renderTickMarks(); // Update slider colors
+                        drawHighlightsOnPage(parseInt($('#page-left').attr('data-page')), document.getElementById('page-left'));
+                        drawHighlightsOnPage(parseInt($('#page-right').attr('data-page')), document.getElementById('page-right'));
+                        $('#annotation-modal').hide();
+                    });
+                }
+            });
+
+            $('#btn-settings').on('click', function() { $('#settings-menu').fadeToggle('fast'); $('#toc-menu').removeClass('open'); });
+            $('#btn-toc').on('click', function() { $('#toc-menu').toggleClass('open'); $('#settings-menu').fadeOut('fast'); });
+            
+            $('.tab-btn').on('click', function() {
+                $('.tab-btn').removeClass('active');
+                $(this).addClass('active');
+                $('.tab-content').removeClass('active').hide();
+                $('#' + $(this).data('target')).addClass('active').show();
+                
+                // Auto-scroll the grid to the currently active page when tab is opened
+                if ($(this).data('target') === 'tab-thumbnails') {
+                    var $activeThumb = $('.active-thumb').first();
+                    if ($activeThumb.length) {
+                        var scrollPos = $activeThumb.offset().top - $('#tab-thumbnails').offset().top + $('#tab-thumbnails').scrollTop() - 50;
+                        $('#tab-thumbnails').scrollTop(scrollPos);
+                    }
+                }
+            });
+            
+            // --- DYNAMIC PAGE SCOOTING ---
+            function adjustForUI() {
+                var isUIHidden = $('#reader-header').hasClass('hidden');
+                var screenHeight = $('#viewer-wrapper').innerHeight();
+                var $activePage = $('.pdf-page-container').filter(function() { return $(this).css('display') !== 'none'; }).first();
+                var pageHeight = $activePage.height();
+                
+                if (!pageHeight) return;
+
+                // Header is 50px, Footer is 100px. We need > 150px of extra space to fit it all.
+                if (!isUIHidden && pageHeight <= (screenHeight - 150)) {
+                    // Wrapper has 15px top padding. Translate 45px down to clear the 50px header safely.
+                    $('#pdf-layout-container').css('transform', 'translateY(45px)');
+                } else {
+                    $('#pdf-layout-container').css('transform', 'translateY(0)');
+                }
+            }
+
+            $('#viewer-wrapper').on("click", function(e) {
+                if (!$(e.target).hasClass('pdf-highlight') && 
+                    !$(e.target).hasClass('pdf-internal-link') && 
+                    $(e.target).closest('.dog-ear-zone').length === 0 && 
+                    window.getSelection().toString().length === 0) {
+                    $('#reader-header').toggleClass('hidden');
+                    $('#reader-footer').toggleClass('hidden'); 
+                    $('#settings-menu').fadeOut('fast');
+                    $('#toc-menu').removeClass('open');
+                    
+                    adjustForUI();
+                }
+            });
+
+            $('#nav-mode-select').on('change', function() { 
+                readerSettings.navMode = $(this).val(); 
+                applyNavMode(); 
+                syncProgress(); 
+            });
+
+            $('#force-single-check').on('change', function() {
+                var isChecked = $(this).is(':checked');
+                readerSettings.forceSingleLandscape = isChecked;
+                
+                if (isChecked) {
+                    // Gray out and disable the radio buttons below
+                    $('.layout-option').css('opacity', '0.4');
+                    $('input[name="layout-radio"]').prop('disabled', true);
+                } else {
+                    // Restore them to full opacity and function
+                    $('.layout-option').css('opacity', '1');
+                    $('input[name="layout-radio"]').prop('disabled', false);
+                }
+                
+                renderView(); // Instantly apply the layout change
+                syncProgress(); // Save the new setting to the database
+            });
+
+            $('input[name="layout-radio"]').on('change', function() { 
+                readerSettings.layout = $(this).val(); 
+                renderView(); 
+                syncProgress(); 
+            });
+
+            $('#theme-select').on('change', function() { 
+                readerSettings.theme = $(this).val(); 
+                applyTheme(); 
+                renderView(); // Redraws highlights to apply optimized contrast colors
+                renderTickMarks();
+                renderSidebarLists();
+                syncProgress(); 
+            });
+
+            var lastEffectiveLayout = getEffectiveLayout();
+            var resizeTimer;
+            
+            $(window).on('resize', function() {
+                lastEffectiveLayout = getEffectiveLayout();
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(function() {
+                    if (!isRendering && pdfDoc) renderView();
+                }, 250);
+            });
+
+            $('#progress-slider').on('input', function() { 
+                updatePageIndicator(parseInt($(this).val())); 
+            });
+            $('#progress-slider').on('change', function() { 
+                transitionToPage(parseInt($(this).val())); 
+            });
+            
+            $('#btn-jump-start').on('click', function() { transitionToPage(1); });
+            $('#btn-jump-end').on('click', function() { transitionToPage(pdfDoc.numPages); });
+            
+            function updateAnnButtons() {
+                var $prevBtn = $('#btn-prev-ann');
+                var $nextBtn = $('#btn-next-ann');
+                
+                if (Object.keys(loadedAnnotations).length === 0) {
+                    $prevBtn.prop('disabled', true);
+                    $nextBtn.prop('disabled', true);
+                    return;
+                }
+
+                var hasPrev = false;
+                var hasNext = false;
+                
+                Object.values(loadedAnnotations).forEach(function(ann) {
+                    try {
+                        var p = JSON.parse(ann.cfi).page;
+                        if (p < pageNum) hasPrev = true;
+                        if (p > pageNum) hasNext = true;
+                    } catch(e) {}
+                });
+
+                $prevBtn.prop('disabled', !hasPrev);
+                $nextBtn.prop('disabled', !hasNext);
+            }
+
+            function jumpToAnnotation(direction) {
+                var sortedAnns = Object.values(loadedAnnotations).sort(function(a, b) {
+                    try { return JSON.parse(a.cfi).page - JSON.parse(b.cfi).page; } catch(e) { return 0; }
+                });
+                if (sortedAnns.length === 0) return;
+
+                var targetPage = null;
+                if (direction === 1) { 
+                    for (var i = 0; i < sortedAnns.length; i++) {
+                        var p = JSON.parse(sortedAnns[i].cfi).page;
+                        if (p > pageNum) { targetPage = p; break; }
+                    }
+                } else { 
+                    for (var i = sortedAnns.length - 1; i >= 0; i--) {
+                        var p = JSON.parse(sortedAnns[i].cfi).page;
+                        if (p < pageNum) { targetPage = p; break; }
+                    }
+                }
+                
+                if (targetPage) transitionToPage(targetPage);
+            }
+
+            $('#btn-prev-ann').on('click', function() { jumpToAnnotation(-1); });
+            $('#btn-next-ann').on('click', function() { jumpToAnnotation(1); });
+
+            $('#btn-close').on('click', function(e) {
+                e.preventDefault();
+                if (window.history.length > 1) window.history.back(); 
+                else window.location.href = "{{ url_for('web.index') }}";
+            });
+
+            var saveTimeout;
+            function syncProgress() {
+                if (mismatchDetected) return; //
+                clearTimeout(saveTimeout);
+                saveTimeout = setTimeout(function() {
+                    var locStr = JSON.stringify({ page: pageNum });
+                    var settingsStr = JSON.stringify(readerSettings);
+                    localStorage.setItem(localKey, settingsStr);
+                    
+                    var safeProgress = pdfDoc ? (pageNum / pdfDoc.numPages) : 0;
+
+                    $.ajax({
+                        type: "POST",
+                        url: "{{ url_for('web.save_progress', book_id=pdffile) }}",
+                        data: {
+                            location: locStr, progress: safeProgress.toString(),
+                            settings: settingsStr, format: "PDF", csrf_token: "{{ csrf_token() }}"
+                        }
+                    });
+                }, 800); 
+            }
+
+            // --- CUSTOM WARNING MODAL LOGIC ---
+            if (mismatchDetected) {
+                $('#format-warning-text').text("You were previously reading the ePub version of this book. Bookmarks and annotations made to the ePub will not be visible here. Furthermore, your reading position will be reset to the start of the book. Are you sure you wish to continue?");
+                $('#format-warning-modal').css('display', 'flex');
+            }
+
+            $('#btn-warning-cancel').on('click', function() {
+                if (window.history.length > 1) window.history.back(); // Returns to previous page state (modal open)
+                else window.location.href = "{{ url_for('web.index') }}";
+            });
+
+            $('#btn-warning-proceed').on('click', function() {
+                mismatchDetected = false;
+                $('#format-warning-modal').fadeOut('fast');
+                syncProgress(); // Force save to overwrite the old ePub data
+            });
+        });
+    </script>
+
+    <div id="format-warning-modal" style="display: none;">
+        <div class="warning-box">
+            <div class="warning-icon">⚠️</div>
+            <h3>Different Book Format</h3>
+            <p id="format-warning-text"></p>
+            <div style="display: flex; justify-content: space-between; gap: 10px;">
+                <button id="btn-warning-cancel" class="warning-btn" style="flex: 1;">Cancel</button>
+                <button id="btn-warning-proceed" class="warning-btn" style="flex: 1;">Continue</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,788 @@
+{% extends is_xhr|yesno("fragment.html", "layout.html") %}
+{% block header %}
+    <meta property="og:type" content="book" />
+    <meta property="og:title" content="{{ entry.title|truncate(35) }}" />
+    {% if entry.comments|length > 0 and entry.comments[0].text|length > 0 %}
+      <meta property="og:description" content="{{ entry.comments[0].text|striptags|truncate(65) }}" />
+      <meta property="og:image" content="{{url_for('web.get_cover', book_id=entry.id, resolution='og', c=entry|last_modified)}}" />
+    {% endif %}
+{% endblock %}
+
+{% block body %}
+<script>
+    // --- IMMORTAL KEYBOARD NAVIGATION SCRIPT ---
+    (function() {
+        var bookId = parseInt("{{ entry.id }}");
+        
+        // Loop every 50ms in the deep background, ignoring any details.js crashes
+        var checkExist = setInterval(function() {
+            var $prevBtn = $('#prev-book-btn');
+            var $nextBtn = $('#next-book-btn');
+            
+            // Wait until the HTML buttons actually render on the screen
+            if ($prevBtn.length > 0) {
+                clearInterval(checkExist); 
+                
+                // 1. Calculate URLs manually
+                var bookIds = [];
+                var urls = [];
+                $('.cover[data-book-id]').filter(function() {
+                    return $(this).closest('.carousel, .swiper, .scroller, [id*="carousel"]').length === 0;
+                }).each(function() {
+                    var $a = $(this).find('a[data-toggle="modal"]');
+                    if ($a.length > 0) {
+                        var id = parseInt($(this).data('book-id'));
+                        if (!isNaN(id) && bookIds.indexOf(id) === -1) {
+                            bookIds.push(id);
+                            urls.push($a.attr('href'));
+                        }
+                    }
+                });
+
+                // 2. Enable buttons
+                var currentIndex = bookIds.indexOf(bookId);
+                if (currentIndex > 0) {
+                    $prevBtn.prop('disabled', false).data('url', urls[currentIndex - 1]);
+                }
+                if (currentIndex !== -1 && currentIndex < bookIds.length - 1) {
+                    $nextBtn.prop('disabled', false).data('url', urls[currentIndex + 1]);
+                }
+
+                // 3. Attach Click Events
+                $('#prev-book-btn, #next-book-btn').off('click.immortal').on('click.immortal', function(e) {
+                    e.preventDefault();
+                    var targetUrl = $(this).data('url');
+                    if (targetUrl) {
+                        var $modalContent = $('#bookDetailsModal .modal-content');
+                        if ($modalContent.length === 0) $modalContent = $(this).closest('.modal-content');
+                        $modalContent.html('<div class="text-center" style="padding: 100px;"><div class="spinner-blue"></div><h3 style="margin-top:20px; color:#333;">Loading...</h3></div>');
+                        $.ajax({
+                            url: targetUrl,
+                            type: 'GET',
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                            success: function(response) { $modalContent.html(response); }
+                        });
+                    }
+                });
+
+                // 4. Arm Native Keyboard
+                if (window.modalNavListener) window.removeEventListener('keydown', window.modalNavListener, true);
+
+                window.modalNavListener = function(e) {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+                    if (e.keyCode === 37 || e.key === 'ArrowLeft') { 
+                        if (!$prevBtn.prop('disabled') && $prevBtn.data('url')) {
+                            e.preventDefault();
+                            $prevBtn.click();
+                        }
+                    } else if (e.keyCode === 39 || e.key === 'ArrowRight') { 
+                        if (!$nextBtn.prop('disabled') && $nextBtn.data('url')) {
+                            e.preventDefault();
+                            $nextBtn.click();
+                        }
+                    }
+                };
+                window.addEventListener('keydown', window.modalNavListener, true);
+            }
+        }, 50);
+    })();
+</script>
+
+{% set wishlist_ns = namespace(id=None) %}
+{% if current_user.is_authenticated %}
+    {% for shelf in g.shelves_access %}
+        {% if "wishlist" in shelf.name|string|lower %}
+            {% set wishlist_ns.id = shelf.id %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
+{% set wishlist_id = wishlist_ns.id %}
+
+<style>
+    /* --- QUARANTINED MODAL CSS --- */
+    /* Prefixing with #bookDetailsModal ensures these rules NEVER bleed onto the main grid */
+
+    /* 1. Modal Window Dimensions */
+    #bookDetailsModal .modal-dialog { 
+        width: 90vw !important; 
+        max-width: 1000px !important; 
+        margin: 30px auto !important;
+    }
+    @media (min-width: 992px) {
+        #bookDetailsModal .modal-dialog { 
+            width: 66vw !important; 
+            max-width: 1600px !important; 
+        }
+    }
+    
+    /* 2. Hide Native Bootstrap Elements */
+    #bookDetailsModal .modal-header, 
+    #bookDetailsModal .modal-footer { 
+        display: none !important; 
+    }
+    
+    /* 3. Structural Plumbing */
+    #bookDetailsModal .modal-content { 
+        height: auto !important; 
+        max-height: 85vh !important; 
+        overflow: hidden !important; 
+        display: flex !important; 
+        flex-direction: column !important; 
+        width: 100% !important;
+    }
+    
+    /* THIS WAS THE CULPRIT: Now it only targets the container inside the modal! */
+    #bookDetailsModal .modal-body, 
+    #bookDetailsModal .container-fluid { 
+        width: 100% !important;
+        padding: 0 !important;
+        display: flex !important;
+        justify-content: flex-start !important;
+        position: relative !important;
+    } 
+
+    /* 4. The Main Detail Container */
+    #bookDetailsModal .single {
+        margin-left: 0 !important;
+        margin-right: auto !important; 
+        width: 100% !important;
+        height: auto !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important; 
+    }
+
+    /* 5. Inner Flexbox Rules */
+    #bookDetailsModal .single > .row {
+        height: auto !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important; 
+    }
+    
+    /* Left Column (Anchor) */
+    #bookDetailsModal .single > .row > div:nth-child(1) {
+        flex: 0 0 250px !important; 
+        width: 250px !important; 
+    }
+    
+    /* Right Column (Fills remaining) */
+    #bookDetailsModal .single > .row > div:nth-child(2) {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    /* 6. Protect Comments & Metadata columns */
+    #bookDetailsModal .single .col-sm-9 .row > .col-sm-4 {
+        flex: 0 0 33.3333% !important;
+        max-width: 33.3333% !important;
+    }
+    #bookDetailsModal .single .col-sm-9 .row > .col-sm-8 {
+        flex: 0 0 66.6666% !important;
+        max-width: 66.6666% !important;
+    }
+    #bookDetailsModal .single .col-sm-9 .row > .col-sm-12 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* 7. General Styling */
+    #bookDetailsModal .scrollable-y { 
+        overflow-y: auto; 
+        scrollbar-width: thin; 
+        padding-bottom: 80px; 
+    }
+    #bookDetailsModal .shelf-action { 
+        text-decoration: none !important; 
+        display: block; 
+        padding: 8px 5px; 
+        color: #333; 
+        transition: background 0.2s; 
+    }
+    #bookDetailsModal .shelf-action:hover { 
+        background-color: #f5f5f5; 
+        border-radius: 4px; 
+    }
+    #bookDetailsModal .shelf-action .glyphicon { 
+        margin-right: 8px; 
+    }
+    #bookDetailsModal .modal-nav button:disabled {
+        opacity: 0.25 !important;
+        cursor: default !important;
+        background-color: #e0e0e0 !important;
+        border-color: #ccc !important;
+        box-shadow: none !important;
+    }
+    #bookDetailsModal .modal-nav button {
+        transition: all 0.2s ease;
+    }
+
+    /* --- DARK MODE OVERRIDES --- */
+    @media (prefers-color-scheme: dark) {
+        #bookDetailsModal .single, 
+        #bookDetailsModal .single #title,
+        #bookDetailsModal .single h4[style*="color: #777"] { 
+            color: #dddddd !important; 
+        }
+        #bookDetailsModal .single .author, 
+        #bookDetailsModal .single .author a { 
+            color: #aaaaaa !important; 
+        }
+        #bookDetailsModal .single div[style*="border-bottom: 1px solid #eee"],
+        #bookDetailsModal .single div[style*="border-right: 1px solid #eee"],
+        #bookDetailsModal .single div[style*="border-left: 1px solid #eee"],
+        #bookDetailsModal .single hr {
+            border-color: #333 !important;
+        }
+        #bookDetailsModal .modal-nav button { 
+            background-color: #333 !important; 
+            border-color: #444 !important; 
+        }
+        #bookDetailsModal .modal-nav button span { 
+            color: #dddddd !important; 
+        }
+        #bookDetailsModal .modal-nav button:disabled { 
+            background-color: #222 !important; 
+            border-color: #222 !important; 
+            opacity: 0.3 !important; 
+        }
+        #bookDetailsModal .close span { 
+            color: #dddddd !important; 
+            text-shadow: none !important; 
+        }
+        #bookDetailsModal .shelf-action { 
+            color: #dddddd !important; 
+        }
+        #bookDetailsModal .shelf-action:hover { 
+            background-color: #333 !important; 
+        }
+        #bookDetailsModal .well { 
+            background-color: #1e1e1e !important; 
+            border-color: #333 !important; 
+        }
+    }
+</style>
+
+{% set has_desc = entry.comments|length > 0 and entry.comments[0].text|length > 0 %}
+
+<div class="single" style="height: 100%; padding: 45px 20px 20px 20px; box-sizing: border-box; position: relative; width: 100%;">
+    
+    <div class="modal-nav" style="position: absolute; left: 20px; top: 12px; z-index: 999; display: flex; gap: 8px;">
+        <button id="prev-book-btn" class="btn btn-default btn-sm" disabled title="{{ _('Previous Book') }}" style="border-radius: 4px; outline: none; padding: 4px 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <span class="glyphicon glyphicon-chevron-left" style="color: #555;"></span>
+        </button>
+        <button id="next-book-btn" class="btn btn-default btn-sm" disabled title="{{ _('Next Book') }}" style="border-radius: 4px; outline: none; padding: 4px 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <span class="glyphicon glyphicon-chevron-right" style="color: #555;"></span>
+        </button>
+    </div>
+
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close" 
+            style="position: absolute; right: 15px; top: 10px; z-index: 999; opacity: 1; outline: none;">
+        <span aria-hidden="true" style="font-size: 30px; color: #555; text-shadow: 0 1px 0 #fff;">&times;</span>
+    </button>
+
+    <div class="row" style="height: 100%; display: flex; flex-wrap: nowrap;">
+        
+        <div class="col-sm-3 col-lg-3 col-xs-4 text-center" style="border-right: 1px solid #eee; padding-right: 15px; display: flex; flex-direction: column;">
+            <div class="cover" style="margin-bottom: 20px; flex-shrink: 1; min-height: 0;">
+                <img id="detailcover" title="{{ entry.title }}"
+                     src="{{ url_for('web.get_cover', book_id=entry.id, resolution='og', c=entry|last_modified) }}"
+                     style="max-width: 100%; height: auto; max-height: 40vh; object-fit: contain; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+            </div>
+
+            <div class="btn-toolbar" role="toolbar" style="display: flex; flex-direction: column; gap: 8px; width: 100%; overflow-y: auto; padding-bottom: 80px;">
+                {% if current_user.role_viewer() %}
+                    {% if entry.reader_list %}
+                        {% for format in entry.reader_list %}
+                        <a target="_self" href="{{ url_for('web.read_book', book_id=entry.id, book_format=format) }}" class="btn btn-success btn-sm btn-block" style="margin-left: 0; margin-top: 5px;">
+                            <span class="glyphicon glyphicon-book"></span> {{ _('Read') }} {{ format|upper }}
+                        </a>
+                        {% endfor %}
+                    {% endif %}
+                    {% if entry.audio_entries %}
+                        {% for format in entry.audio_entries %}
+                        <a target="_self" href="{{ url_for('web.read_book', book_id=entry.id, book_format=format) }}" class="btn btn-success btn-sm btn-block" style="margin-left: 0; margin-top: 5px;">
+                            <span class="glyphicon glyphicon-music"></span> {{ _('Listen') }} {{ format|upper }}
+                        </a>
+                        {% endfor %}
+                    {% endif %}
+                {% endif %}
+
+                {% if current_user.role_download() and entry.data|length %}
+                    {% for format in entry.data %}
+                        <a href="{{ url_for('web.download_link', book_id=entry.id, book_format=format.format|lower, anyname=entry.id|string+'.'+format.format|lower|replace('kepub', 'kepub.epub')) }}"
+                           class="btn btn-primary btn-sm btn-block download-btn" 
+                           data-size="{{ format.uncompressed_size|default(0) }}"
+                           style="margin-left: 0; margin-top: 5px;">
+                            <span class="glyphicon glyphicon-download"></span> {{ _('Download') }} {{ format.format|upper }}
+                        </a>
+                    {% endfor %}
+                {% endif %}
+
+                
+
+                {% if current_user.kindle_mail and entry.email_share_list %}
+                     <div class="btn-group" style="width: 100%; margin-left: 0; margin-top: 5px;">
+                        {% if entry.email_share_list|length == 1 %}
+                            <button class="btn btn-info btn-sm btn-block sendbtn-form" data-href="{{url_for('web.send_to_ereader', book_id=entry.id, book_format=entry.email_share_list[0]['format'], convert=entry.email_share_list[0]['convert'])}}">
+                                <span class="glyphicon glyphicon-send"></span> {{ _('Send') }}
+                            </button>
+                        {% else %}
+                             <button type="button" class="btn btn-info btn-sm btn-block dropdown-toggle" data-toggle="dropdown">
+                                <span class="glyphicon glyphicon-send"></span> {{ _('Send') }} <span class="caret"></span>
+                            </button>
+                            <ul class="dropdown-menu">
+                                {% for format in entry.email_share_list %}
+                                    <li><a class="sendbtn-form" data-href="{{url_for('web.send_to_ereader', book_id=entry.id, book_format=format['format'], convert=format['convert'])}}">{{ format['text'] }}</a></li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                     </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-sm-9 col-lg-9 col-xs-8" style="display: flex; flex-direction: column; max-height: 85vh;">
+            <div style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; padding-right: 130px;">
+                <h2 id="title" style="margin-top: 0; font-size: 24px;">{{ entry.title }}</h2>
+                <div class="author" style="font-size: 16px; color: #555;">
+                    {% for author in entry.ordered_authors %}
+                        <a href="{{ url_for('web.books_list',  data='author', sort_param='stored', book_id=author.id ) }}">{{ author.name.replace('|',',') }}</a>
+                        {% if not loop.last %} &amp; {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="row" style="flex: 1; overflow: hidden; display: flex;">
+                <div class="{% if has_desc %}col-sm-4{% else %}col-sm-12{% endif %} scrollable-y" style="padding-right: 20px; height: 100%; overflow-y: auto;">
+                    
+                    {% if not current_user.is_anonymous %}
+                        <div class="user-rating-container" style="margin-bottom: 15px;">
+                            <label style="font-weight: bold; margin-right: 10px; margin-bottom: 0;">{{ _('My Rating') }}:</label>
+                            <select id="user_rating_select" class="form-control input-sm" style="width: 130px; display: inline-block;">
+                                <option value="0" {% if user_rating == 0 %}selected{% endif %}>{{ _('Not Rated') }}</option>
+                                <option value="2" {% if user_rating == 2 %}selected{% endif %}>&#9733; 1 Star</option>
+                                <option value="4" {% if user_rating == 4 %}selected{% endif %}>&#9733;&#9733; 2 Stars</option>
+                                <option value="6" {% if user_rating == 6 %}selected{% endif %}>&#9733;&#9733;&#9733; 3 Stars</option>
+                                <option value="8" {% if user_rating == 8 %}selected{% endif %}>&#9733;&#9733;&#9733;&#9733; 4 Stars</option>
+                                <option value="10" {% if user_rating == 10 %}selected{% endif %}>&#9733;&#9733;&#9733;&#9733;&#9733; 5 Stars</option>
+                            </select>
+                            <span id="user_rating_status" style="margin-left: 10px; color: #5cb85c; display: none;"><span class="glyphicon glyphicon-ok"></span> Saved</span>
+                        </div>
+                    {% endif %}
+
+                    {% if entry.ratings.__len__() > 0 %}
+                        <div class="rating" style="margin-bottom: 10px;">
+                            {% for number in range((entry.ratings[0].rating/2)|int(2)) %}
+                                <span class="glyphicon glyphicon-star good" style="color: #f0ad4e;"></span>
+                                {% if loop.last and loop.index < 5 %}
+                                    {% for numer in range(5 - loop.index) %}
+                                        <span class="glyphicon glyphicon-star-empty" style="color: #ccc;"></span>
+                                    {% endfor %}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    
+                    {% if entry.series|length > 0 %}
+                        <p><strong>{{ _('Series') }}:</strong> 
+                            {% if entry.series_index|float > 0 %}
+                                {{ _("Book %(index)s of %(range)s", index=entry.series_index|formatfloat(2), range=(url_for('web.books_list', data='series', sort_param='stored', book_id=entry.series[0].id)|escapedlink(entry.series[0].name))|safe) }}
+                            {% else %}
+                                <a href="{{ url_for('web.books_list', data='series', sort_param='stored', book_id=entry.series[0].id) }}">{{ entry.series[0].name }}</a>
+                            {% endif %}
+                        </p>
+                    {% endif %}
+
+                    {% if entry.languages|length > 0 %}
+                        <p><strong>{{_('Language')}}:</strong> {% for language in entry.languages %}{{language.language_name}}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+                    {% endif %}
+
+                    {% if entry.pages %}
+                        <p><strong>{{ _('Page Count') }}:</strong> {{ entry.pages }}</p>
+                    {% endif %}
+
+                    {% if entry.data|length > 0 %}
+                        <div style="margin-top: 10px; margin-bottom: 10px;">
+                            <strong>{{ _('Available Formats') }}:</strong>
+                            <ul style="list-style-type: none; padding-left: 20px; margin: 0;">
+                                {% for format in entry.data %}
+                                    <li style="margin-top: 2px;">{{ format.format|trim }}: {{ format.uncompressed_size|filesizeformat }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    {% if entry.publishers|length > 0 %}
+                        <p><strong>{{ _('Publisher') }}:</strong> <a href="{{ url_for('web.books_list', data='publisher', sort_param='stored', book_id=entry.publishers[0].id ) }}">{{ entry.publishers[0].name }}</a></p>
+                    {% endif %}
+                    
+                    {% if (entry.pubdate|string)[:10] != '0101-01-01' %}
+                        <p><strong>{{ _('Published') }}:</strong> {{ entry.pubdate|formatdate }}</p>
+                    {% endif %}
+
+                    {% if entry.tags|length > 0 %}
+                        <p style="line-height: 2;">
+                            {% for tag in entry.tags %}
+                                <a href="{{ url_for('web.books_list', data='category', sort_param='stored', book_id=tag.id) }}" class="label label-info" style="font-weight: normal; font-size: 90%;">{{ tag.name }}</a>
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+
+                    {% if cc|length > 0 %}
+                        <hr style="margin: 10px 0;">
+                        {% for c in cc %}
+                            {% if entry['custom_column_' ~ c.id]|length > 0 %}
+                                <div class="real_custom_columns" style="margin-bottom: 5px;">
+                                    <strong>{{ c.name }}:</strong>
+                                    {% for column in entry['custom_column_' ~ c.id] %}
+                                        {% if c.datatype == 'rating' %}{{ (column.value / 2)|formatfloat }}{% elif c.datatype == 'bool' %}{% if column.value == true %}<span class="glyphicon glyphicon-ok"></span>{% else %}<span class="glyphicon glyphicon-remove"></span>{% endif %}{% else %}{{ column.value }}{% endif %}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    
+                    {% if not current_user.is_anonymous %}
+                        <hr style="margin: 10px 0;">
+                        
+                        {% if wishlist_id %}
+                        {% set in_wishlist = wishlist_id in books_shelfs %}
+                        <form id="wishlist_form" style="margin-bottom: 5px;">
+                            <label style="font-weight: bold; cursor: pointer; color: #d9534f;">
+                                <input id="wishlist_cb" type="checkbox" 
+                                       data-add-url="{{ url_for('shelf.add_to_shelf', book_id=entry.id, shelf_id=wishlist_id) }}"
+                                       data-remove-url="{{ url_for('shelf.remove_from_shelf', book_id=entry.id, shelf_id=wishlist_id) }}"
+                                       {% if in_wishlist %}checked="checked"{% endif %}>
+                                <span class="glyphicon glyphicon-heart-empty" style="margin-right: 5px;"></span>{{ _('Wishlist') }}
+                            </label>
+                        </form>
+                        {% endif %}
+
+                        <form id="have_read_form" action="{{ url_for('web.toggle_read', book_id=entry.id) }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <label style="font-weight: normal; cursor: pointer;">
+                                <input id="have_read_cb" type="checkbox" {% if entry.read_status %}checked="checked"{% endif %}> {{ _('Read') }}
+                            </label>
+                        </form>
+                        {% if current_user.check_visibility(32768) %}
+                        <form id="archived_form" action="{{ url_for('web.toggle_archived', book_id=entry.id) }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <label style="font-weight: normal; cursor: pointer;">
+                                <input id="archived_cb" type="checkbox" {% if entry.is_archived %}checked="checked"{% endif %}> {{ _('Archived') }}
+                            </label>
+                        </form>
+                        {% endif %}
+                    {% endif %}
+
+                    <div style="margin-top: 20px;">
+                         {% if current_user.is_authenticated %}
+                            {% if current_user.shelf.all() or g.shelves_access %}
+                                <button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#shelfCollapseList">
+                                    <span class="glyphicon glyphicon-list"></span> {{ _('Manage Shelves') }}
+                                </button>
+                                
+                                <div class="collapse" id="shelfCollapseList" style="margin-top: 10px;">
+                                    <div class="well" style="max-height: 15vh; overflow-y: auto; padding: 5px;">
+                                        <ul class="list-unstyled" style="margin-bottom: 0;">
+                                            {% for shelf in g.shelves_access %}
+                                                {% if not shelf.is_public or current_user.role_edit_shelfs() %}
+                                                {% if "wishlist" not in shelf.name|string|lower %}
+                                                {% set is_in_shelf = shelf.id in books_shelfs %}
+                                                <li>
+                                                    <a href="#" class="shelf-action"
+                                                       data-action="{% if is_in_shelf %}remove{% else %}add{% endif %}"
+                                                       data-add-url="{{ url_for('shelf.add_to_shelf', book_id=entry.id, shelf_id=shelf.id) }}"
+                                                       data-remove-url="{{ url_for('shelf.remove_from_shelf', book_id=entry.id, shelf_id=shelf.id) }}">
+                                                       <span class="glyphicon {% if is_in_shelf %}glyphicon-remove text-danger{% else %}glyphicon-plus text-primary{% endif %}"></span>
+                                                       {{ shelf.name }}
+                                                    </a>
+                                                </li>
+                                                {% endif %}
+                                                {% endif %}
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% endif %}
+                        {% if current_user.role_edit() %}
+                             <a href="{{ url_for('edit-book.show_edit_book', book_id=entry.id) }}" class="btn btn-default btn-xs"><span class="glyphicon glyphicon-edit"></span> {{ _('Edit Metadata') }}</a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if has_desc %}
+                <div class="col-sm-8 scrollable-y" style="border-left: 1px solid #eee; padding-left: 20px; height: 100%; overflow-y: auto;">
+                    <h4 style="margin-top: 0; color: #777;">{{ _('Description') }}</h4>
+                    <div class="description-content" style="font-size: 14px; line-height: 1.6;">
+                        {{ entry.comments[0].text|safe }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <button type="button" class="btn btn-default" data-dismiss="modal" 
+            style="position: absolute; bottom: 20px; right: 25px; z-index: 999; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+        {{ _('Close') }}
+    </button>
+</div>
+
+<script>
+    // --- 2. EXISTING CALIBRE-WEB CODE ---
+    $(document).ready(function() {
+        var csrfToken = "{{ csrf_token() }}";
+        var bookId = parseInt("{{ entry.id }}");
+
+        // --- 1. GLOBAL CLICK TRACKER ---
+        // 'mousedown' fires instantly, capturing the clicked element BEFORE the modal even starts loading
+        if (!window.setupClickTracker) {
+            $(document).on('mousedown', function(e) {
+                window.lastClickTarget = e.target;
+            });
+            window.setupClickTracker = true;
+        }
+
+        var hideButtons = false;
+
+        // Check if the last thing clicked was inside a carousel/scroller
+        if (window.lastClickTarget) {
+            if ($(window.lastClickTarget).closest('.carousel, .swiper, .scroller, [id*="carousel"]').length > 0) {
+                hideButtons = true;
+            }
+        }
+
+        // --- 2. APPLY LOGIC ---
+        if (hideButtons) {
+            // Safely hide the buttons if opened from a carousel
+            $('.modal-nav').css('display', 'none');
+        } else {
+            var bookIds = [];
+            var urls = [];
+            
+            // Safely filter out the carousel items and build the main grid array
+            $('.cover[data-book-id]').filter(function() {
+                return $(this).closest('.carousel, .swiper, .scroller, [id*="carousel"]').length === 0;
+            }).each(function() {
+                var $a = $(this).find('a[data-toggle="modal"]');
+                if ($a.length > 0) {
+                    var id = parseInt($(this).data('book-id'));
+                    if (!isNaN(id) && bookIds.indexOf(id) === -1) {
+                        bookIds.push(id);
+                        urls.push($a.attr('href'));
+                    }
+                }
+            });
+
+            var currentIndex = bookIds.indexOf(bookId);
+
+            if (currentIndex === -1) {
+                $('.modal-nav').css('display', 'none');
+            } else {
+                // Activate buttons only if there is a valid previous/next book
+                if (currentIndex > 0) {
+                    $('#prev-book-btn').prop('disabled', false).data('url', urls[currentIndex - 1]);
+                }
+                if (currentIndex < bookIds.length - 1) {
+                    $('#next-book-btn').prop('disabled', false).data('url', urls[currentIndex + 1]);
+                }
+            }
+        }
+
+        $('#prev-book-btn, #next-book-btn').on('click', function(e) {
+            e.preventDefault();
+            var targetUrl = $(this).data('url');
+            if (targetUrl) {
+                var $modalContent = $('#bookDetailsModal .modal-content');
+                if ($modalContent.length === 0) $modalContent = $(this).closest('.modal-content');
+                
+                $modalContent.html('<div class="text-center" style="padding: 100px;"><div class="spinner-blue"></div><h3 style="margin-top:20px; color:#333;">Loading...</h3></div>');
+                
+                $.ajax({
+                    url: targetUrl,
+                    type: 'GET',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    success: function(response) {
+                        $modalContent.html(response);
+                    },
+                    error: function() {
+                        alert("Error loading book details.");
+                        $('#bookDetailsModal').modal('hide');
+                    }
+                });
+            }
+        });
+
+        $('.download-btn').on('click', function(e) {
+            var size = parseInt($(this).data('size')) || 0;
+            var max_bytes = 150 * 1024 * 1024;
+            if (size > max_bytes) {
+                if (!confirm("{{ _('This file is larger than 150MB. Are you sure you want to download it?') }}")) {
+                    e.preventDefault();
+                }
+            }
+        });
+
+        $('#wishlist_cb').on('change', function() {
+            var $cb = $(this);
+            $cb.prop('disabled', true); 
+            var isChecked = $cb.is(':checked');
+            var url = isChecked ? $cb.data('add-url') : $cb.data('remove-url');
+
+            $.ajax({
+                url: url,
+                type: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                data: { csrf_token: csrfToken },
+                success: function() {
+                    var $coverImg = $('.cover[data-book-id="' + bookId + '"] .img');
+                    var $badge = $coverImg.find('.wishlist-overlay');
+                    if (isChecked) {
+                        if ($badge.length === 0) $coverImg.append('<div class="wishlist-overlay"><span class="glyphicon glyphicon-heart"></span></div>');
+                    } else {
+                        $badge.remove();
+                    }
+                },
+                error: function(xhr) { 
+                    alert("Error updating wishlist."); 
+                    console.log(xhr.responseText);
+                    $cb.prop('checked', !isChecked); 
+                },
+                complete: function() {
+                    $cb.prop('disabled', false); 
+                }
+            });
+        });
+
+        $('#have_read_cb').on('change', function() {
+            var isRead = $(this).is(':checked');
+            var $cover = $('.cover[data-book-id="' + bookId + '"]');
+            var url = $('#have_read_form').attr('action');
+            
+            // 1. Update the UI
+            if (isRead) {
+                $cover.addClass('read-book-dimmed');
+                if ($cover.find('.read-overlay').length === 0) $cover.find('.img').append('<div class="read-overlay"><span class="glyphicon glyphicon-ok"></span> READ</div>');
+            } else {
+                $cover.removeClass('read-book-dimmed');
+                $cover.find('.read-overlay').remove();
+            }
+
+            // 2. Ping the Database!
+            $.ajax({
+                url: url,
+                type: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                data: { csrf_token: csrfToken },
+                success: function() {
+                    // 3. If marked as read, auto-clear it from "Currently Reading"
+                    if (isRead) {
+                        $.post("{{ url_for('web.remove_currently_reading', book_id=entry.id) }}", {
+                            csrf_token: csrfToken
+                        });
+                    }
+                },
+                error: function() {
+                    alert("Error saving read status.");
+                }
+            });
+        });
+
+        // --- CUSTOM USER RATING AJAX ---
+        $('#user_rating_select').on('change', function() {
+            var newRating = $(this).val();
+            var $status = $('#user_rating_status');
+            var $select = $(this);
+            
+            // Briefly disable the dropdown so the user doesn't double-click
+            $select.prop('disabled', true);
+            $status.hide();
+
+            $.ajax({
+                url: "/ajax/set_user_rating/" + bookId,
+                type: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                data: {
+                    csrf_token: csrfToken,
+                    rating: newRating
+                },
+                success: function() {
+                    // Flash the green checkmark
+                    $status.fadeIn().delay(1500).fadeOut();
+                    
+                    // --- DYNAMIC PILL UPDATE ---
+                    var $coverImg = $('.cover[data-book-id="' + bookId + '"] .img');
+                    
+                    // 1. Always wipe out the old pill first
+                    $coverImg.find('.user-rating-pill').remove(); 
+                    
+                    var ratingVal = parseInt(newRating);
+                    if (ratingVal > 0) {
+                        // 2. Safely check if the global "Show User Ratings" gear option is turned on
+                        var cookieMatch = document.cookie.match(/(?:^|; )cw_show_user_ratings=([^;]*)/);
+                        var showRatings = cookieMatch ? cookieMatch[1] : '1';
+                        
+                        if (showRatings === '1') {
+                            // 3. Calculate stars vs dots
+                            var stars = Math.floor(ratingVal / 2);
+                            var dots = 5 - stars;
+                            
+                            // 4. Build the HTML and inject it into the cover
+                            var pillHtml = '<div class="user-rating-pill">';
+                            for (var i = 0; i < stars; i++) { pillHtml += '&#9733;'; }
+                            for (var j = 0; j < dots; j++) { pillHtml += '<span class="star-dot">&#9679;</span>'; }
+                            pillHtml += '</div>';
+                            
+                            $coverImg.append(pillHtml);
+                        }
+                    }
+                },
+                error: function() {
+                    alert("Error saving your personal rating.");
+                },
+                complete: function() {
+                    // Re-enable the dropdown
+                    $select.prop('disabled', false);
+                }
+            });
+        });
+        
+        $('.shelf-action').on('click', function(e) {
+            e.preventDefault();
+            var $link = $(this);
+            var action = $link.attr('data-action');
+            var url = (action === 'add') ? $link.data('add-url') : $link.data('remove-url');
+            
+            $.ajax({ 
+                url: url, 
+                type: 'POST', 
+                headers: { 'X-CSRFToken': csrfToken },
+                data: { csrf_token: csrfToken }, 
+                success: function() {
+                    var $icon = $link.find('.glyphicon');
+                    if (action === 'add') {
+                        $link.attr('data-action', 'remove');
+                        $icon.removeClass('glyphicon-plus text-primary').addClass('glyphicon-remove text-danger');
+                    } else {
+                        $link.attr('data-action', 'add');
+                        $icon.removeClass('glyphicon-remove text-danger').addClass('glyphicon-plus text-primary');
+                    }
+                },
+                error: function(xhr) {
+                    console.error("Error managing shelf:", xhr.statusText);
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
+
+{% block js %}
+{% if not is_xhr %}
+<script src="{{ url_for('static', filename='js/details.js') }}"></script>
+<script src="{{ url_for('static', filename='js/fullscreen.js') }}"></script>
+{% endif %}
+{% endblock %}

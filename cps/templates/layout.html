@@ -1,0 +1,960 @@
+{% from 'modal_dialogs.html' import restrict_modal, delete_book, filechooser_modal, delete_confirm_modal, change_confirm_modal %}
+{% import 'image.html' as image %}
+<!DOCTYPE html>
+<html lang="{{ current_user.locale }}">
+  <head>
+    <title>{{instance}} | {{title}}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    {% if g.google_site_verification|length > 0 %}
+      <meta name="google-site-verification" content="{{g.google_site_verification}}">
+    {% endif %}
+    <link rel="apple-touch-icon" sizes="140x140" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link href="{{ url_for('static', filename='css/libs/bootstrap.min.css') }}" rel="stylesheet" media="screen">
+    {% block header %}{% endblock %}
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet" media="screen">
+    <link href="{{ url_for('static', filename='css/upload.css') }}" rel="stylesheet" media="screen">
+    
+    <style>
+        /* 1. General safety padding for standard pages (Right Hand Pane) */
+        .row-fluid > .col-sm-10 {
+            padding-bottom: 80px !important;
+        }
+
+        /* 2. DEFAULT (Desktop/Mouse): Standard padding for Browse/Discover */
+        .browse-books {
+            padding-bottom: 40px !important; 
+        }
+
+        /* 3. TOUCH DEVICES (Android/iPad): Huge padding */
+        @media (pointer: coarse) {
+            .browse-books {
+                padding-bottom: 250px !important; 
+            }
+        }
+        /* Fix HR visibility in Light Mode */
+        body .browse-books hr {
+            border-top: 2px solid #ccc !important;
+            box-shadow: none !important;
+        }
+        /* --- NATIVE SYSTEM DARK MODE --- */
+        @media (prefers-color-scheme: dark) {
+            /* 1. Master Backgrounds (Nuclear Specificity) */
+            html, body, body div.col-sm-2:has(nav.navigation), body .navbar, 
+            body .container-fluid, body .row-fluid, body .row, body .col-sm-2, 
+            body .col-sm-10, body .row-offcanvas, body .sidebar-offcanvas, 
+            body .modal-content, body .well, body #sidebar, body .navigation, 
+            body .navbar-collapse, body ul.nav-pills { 
+                background-color: #121212 !important; 
+                color: #dddddd !important; 
+                color-scheme: dark !important; /* <--- Forces instant scrollbar repaint */
+            }
+            
+            /* 2. Navigation Bar & Mobile Menu */
+            .navbar-default {
+                background-color: #1e1e1e !important;
+                border-color: #333 !important;
+            }
+            .navbar-default .navbar-brand, .navbar-default .navbar-nav>li>a {
+                color: #ccc !important;
+            }
+            .navbar-default .navbar-nav>li>a:hover {
+                color: #fff !important;
+            }
+            
+            /* The Hamburger Button */
+            .navbar-default .navbar-toggle {
+                border-color: #444 !important;
+            }
+            .navbar-default .navbar-toggle:hover, 
+            .navbar-default .navbar-toggle:focus {
+                background-color: #333 !important;
+            }
+            .navbar-default .navbar-toggle .icon-bar {
+                background-color: #ddd !important;
+            }
+
+            /* 3. Sticky Headers & Menus */
+            .sticky-header {
+                background-color: #121212 !important;
+                border-bottom: 1px solid #333 !important;
+            }
+            .dropdown-menu {
+                background-color: #1e1e1e !important;
+                border-color: #333 !important;
+            }
+            .dropdown-menu>li>a {
+                color: #ccc !important;
+            }
+            .dropdown-menu>li>a:hover {
+                background-color: #333 !important;
+                color: #fff !important;
+            }
+
+            /* 4. Book Grid Metadata */
+            .book .meta .title { color: #eee !important; }
+            .book .meta .author-name { color: #aaa !important; }
+            .book .meta .author-name:hover { color: #fff !important; }
+            
+            /* 5. Sidebar Links */
+            body .navigation li a { 
+                color: #aaa !important; 
+            }
+            body .navigation li a:hover { 
+                background-color: #1e1e1e !important; 
+                color: #fff !important; 
+            }
+            body .navigation li.active > a { 
+                background-color: #333 !important; 
+                color: #fff !important; 
+            }
+            
+            /* Preserve Wishlist Red in Dark Mode */
+            body .navigation li a .glyphicon-heart { 
+                color: #d9534f !important; 
+            }
+
+            /* 6. Inputs & Buttons */
+            .form-control {
+                background-color: #222 !important;
+                border-color: #444 !important;
+                color: #ddd !important;
+            }
+            .btn-default {
+                background-color: #222 !important;
+                border-color: #444 !important;
+                color: #ddd !important;
+                text-shadow: none !important;
+            }
+            .btn-default:hover {
+                background-color: #333 !important;
+                color: #fff !important;
+            }
+
+            /* 7. Image Backgrounds (Prevents stark white flashes behind transparent PNGs) */
+            .cover .img {
+                background-color: #222 !important; 
+            }
+            
+            /* 8. Pagination Buttons */
+            .pagination > li > a, .pagination > li > span {
+                background-color: #222 !important;
+                border-color: #333 !important;
+                color: #aaa !important;
+            }
+            .pagination > li.active > a, .pagination > li > a:hover {
+                background-color: #007bff !important;
+                color: #fff !important;
+                border-color: #007bff !important;
+            }
+            .pagination > .disabled > a, .pagination > .disabled > a:hover {
+                background-color: #121212 !important;
+                color: #555 !important;
+                border-color: #333 !important;
+            }
+            
+            /* 9. Loading Overlay */
+            #pagination-loading-overlay {
+                background: rgba(18, 18, 18, 0.95) !important;
+            }
+            #pagination-loading-overlay h3, 
+            #pagination-loading-overlay p {
+                color: #dddddd !important;
+            }
+            /* 10. Sidebar & Navbar Borders */
+            body div.col-sm-2:has(nav.navigation), body #sidebar, body .navigation, body .navbar {
+                border-right-color: #333 !important;
+                border-bottom-color: #333 !important;
+                border-color: #333 !important;
+            }
+
+            /* 11. Global Dark Scrollbars */
+            * {
+                scrollbar-color: #555 #1e1e1e !important; /* Firefox */
+            }
+            
+            ::-webkit-scrollbar {
+                width: 14px !important;
+                height: 14px !important;
+                background-color: #1e1e1e !important; /* Chrome/Safari Track */
+            }
+            
+            ::-webkit-scrollbar-thumb {
+                background-color: #555 !important;
+                border-radius: 8px;
+                border: 3px solid #1e1e1e !important; /* Creates padding effect */
+            }
+            
+            ::-webkit-scrollbar-thumb:hover {
+                background-color: #777 !important;
+            }
+            
+            ::-webkit-scrollbar-corner {
+                background-color: #1e1e1e !important;
+            }
+
+            /* 12. Dark Mode Horizontal Rule */
+            body .browse-books hr {
+                border-top: 2px solid #333 !important;
+                box-shadow: none !important;
+            }
+
+            /* 13. Sticky Header Titles & Counters */
+            body .sticky-header h2, 
+            body .sticky-header h2 small {
+                color: #dddddd !important;
+            }
+
+            /* 14. Book Cover Borders */
+            body .container-fluid .book .cover span img, 
+            body .container-fluid .single .cover img {
+                border-color: #333 !important;
+            }
+
+            /* 15. Stacked Series Shadow Effect */
+            body .book.session.is-stack .img, 
+            body .cr-book.session.is-stack .img {
+                box-shadow: 4px 4px 0 0px #222222, 8px 8px 0 0px #333333 !important;
+            }
+
+            /* 16. Native Series Page Stack Effect */
+            body.grid-view .book .cover img, 
+            body.grid-view .book .cover .img {
+                box-shadow: 4px 4px 0 0px #222222, 8px 8px 0 0px #333333 !important;
+                border-color: #333 !important;
+            }
+
+            /* 17. Reading Progress Meter Tracks */
+            body .book div[style*="height: 5px"], 
+            body .cr-book div[style*="height: 5px"] {
+                background: #333333 !important; 
+            }
+
+            /* 18. Custom List & Tree Views */
+            
+            /* --- Custom Grid/List View --- */
+            body .list-view-grid .list-item {
+                background-color: #1e1e1e !important;
+                border-color: #333 !important;
+            }
+            body .list-view-grid .list-item:hover {
+                background-color: #2a2a2a !important;
+                border-color: #444 !important;
+            }
+            body .list-view-grid .list-item a {
+                color: #dddddd !important;
+            }
+            body .list-view-grid .list-item .badge {
+                background-color: #333 !important;
+                color: #aaa !important;
+            }
+
+            /* --- Custom Tree View --- */
+            body #tree-view .tree-content {
+                background-color: #121212 !important;
+                border-bottom-color: #222 !important;
+            }
+            body #tree-view .tree-content:hover {
+                background-color: #1e1e1e !important;
+            }
+            body #tree-view .tree-link {
+                color: #dddddd !important;
+            }
+            body #tree-view .tree-link.virtual {
+                color: #888888 !important; /* Dims the "unclickable" parent folders */
+            }
+            body #tree-view .tree-caret {
+                color: #777 !important;
+            }
+            body #tree-view .tree-caret.expanded {
+                color: #ccc !important;
+            }
+            body #tree-view .tree-children {
+                border-left-color: #333 !important; /* Darkens the vertical connecting line */
+            }
+            body #tree-view .badge {
+                background-color: #333 !important;
+                color: #aaa !important;
+            }
+
+            /* 19. Gear Icon & Hover State */
+            body .sticky-header .gear-btn,
+            body .gear-btn .glyphicon-cog {
+                color: #dddddd !important; 
+            }
+            
+            body .sticky-header .gear-btn:hover,
+            body .sticky-header .gear-btn:focus {
+                background-color: #2a2a2a !important; 
+                color: #ffffff !important;
+            }
+
+            /* 20. Currently Reading Section Title */
+            body .currently-reading-section h2 {
+                color: #dddddd !important;
+            }
+
+            /* 21. Admin Tables */
+            body .table { color: #dddddd !important; background-color: transparent !important; }
+            body .table > thead > tr > th, body .table > tbody > tr > th, 
+            body .table > tfoot > tr > th, body .table > thead > tr > td, 
+            body .table > tbody > tr > td, body .table > tfoot > tr > td {
+                border-top: 1px solid #333 !important;
+            }
+            body .table-striped > tbody > tr:nth-of-type(odd) {
+                background-color: #181818 !important;
+            }
+            body .table-hover > tbody > tr:hover {
+                background-color: #2a2a2a !important;
+            }
+
+            /* 22. Universal Text Boxes, Dropdowns & Form Inputs */
+            body input[type="text"], body input[type="password"], body input[type="email"], 
+            body input[type="number"], body select, body textarea {
+                background-color: #222 !important;
+                border: 1px solid #444 !important;
+                color: #dddddd !important;
+            }
+            body input:focus, body select:focus, body textarea:focus {
+                border-color: #007bff !important; /* Keep the blue focus ring but darken the box */
+                outline: none !important;
+            }
+
+            /* 23. Admin Panels & Config "Tree Views" */
+            body .panel, body .panel-default {
+                background-color: #121212 !important;
+                border-color: #333 !important;
+            }
+            body .panel-heading {
+                background-color: #1e1e1e !important;
+                border-color: #333 !important;
+                color: #dddddd !important;
+            }
+            body .panel-body {
+                background-color: #121212 !important;
+            }
+
+            /* 24. Admin Modals & Alerts */
+            body .bg-info, body .modal-header.bg-info {
+                background-color: #1a364e !important; /* Muted, deep blue */
+                color: #dddddd !important;
+                border-bottom: 1px solid #333 !important;
+            }
+            body .modal-footer, body .modal-header {
+                border-color: #333 !important;
+            }
+
+            /* 25. Search Page Modal List Fix */
+            body .shelf-list-container {
+                background-color: #1e1e1e !important;
+                border-color: #444 !important;
+            }
+        }
+
+        /* --- GLOBAL LAYOUT & SCROLLBAR STABILIZER --- */
+        
+        /* 1. Strip the 15px bumper from the master layout containers */
+        body > .container-fluid,
+        .container-fluid > .row-fluid > .col-sm-10 {
+            padding-right: 0 !important; 
+        }
+
+        /* 2. Move the padding INSIDE the containers so content doesn't hit the glass */
+        .sticky-header, 
+        .browse-books {
+            padding-right: 15px !important; 
+        }
+
+        /* 3. iOS Flex Wrap Fix */
+        .row.display-flex {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            width: 100% !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+        }
+
+        /* 4. DESKTOP MODE (Mac/PC) - Independent pane scrolling */
+        @media (min-width: 768px) {
+            html, body {
+                overflow-x: clip !important;
+                max-width: 100vw !important;
+            }
+            .browse-books {
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+            }
+        }
+        /* Fallback for older Safari on Mac */
+        @supports not (overflow-x: clip) {
+            @media (min-width: 768px) { html, body { overflow-x: hidden !important; } }
+        }
+
+        /* 5. MOBILE MODE (iPhone/Android) - The iOS Scroll Unlocker */
+        @media (max-width: 767px) {
+            html, body {
+                height: auto !important; 
+                min-height: 100% !important;
+                overflow-x: hidden !important;
+                overflow-y: visible !important;
+                position: static !important;
+                -webkit-overflow-scrolling: touch !important;
+            }
+            .container-fluid, .row-fluid, .col-sm-10, .browse-books {
+                height: auto !important;
+                overflow-y: visible !important;
+            }
+        }
+
+        /* --- APPLE/ANDROID SMART INVERT FIX --- */
+        /* If the device aggressively inverts the screen to simulate dark mode, this flips images back to normal */
+        @media (inverted-colors: inverted) {
+            img, .cover, .cover .img, .author-photo {
+                filter: invert(100%) hue-rotate(180deg) !important;
+            }
+        }
+
+        /* --- E-INK MODE --- */
+        body.eink-mode, body.eink-mode * {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+            transition: none !important; /* Disables all animations */
+        }
+        body.eink-mode img, body.eink-mode .cover .img {
+            filter: grayscale(100%) contrast(120%) !important; /* Punches up contrast for e-ink */
+        }
+        body.eink-mode .book .cover .img, body.eink-mode .form-control, body.eink-mode .btn {
+            border: 2px solid #000000 !important;
+            border-radius: 0 !important; /* Sharp corners render cleaner on e-ink */
+        }
+        /* Removed .navigation li.active > a to drop the black box */
+        body.eink-mode .btn-primary, body.eink-mode .pagination > li.active > a {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+            border-color: #000000 !important;
+        }
+        
+        /* Just make the active sidebar item bold instead */
+        body.eink-mode .navigation li.active > a {
+            background-color: transparent !important;
+            color: #000000 !important;
+            font-weight: 900 !important;
+        }
+        body.eink-mode .navbar-default, body.eink-mode .sticky-header {
+            border-bottom: 2px solid #000000 !important;
+        }
+    </style>
+
+    {% if g.current_theme == 1 %}
+       <link href="{{ url_for('static', filename='css/caliBlur.css') }}" rel="stylesheet" media="screen">
+       <link href="{{ url_for('static', filename='css/caliBlur_override.css') }}" rel="stylesheet" media="screen">
+    {% endif %}
+  </head>
+  <body class="{{ page }} {{ bodyClass }}{% if g.current_theme == 1 %} blur{% endif %} {% if request.cookies.get('cw_eink_mode') == '1' %}eink-mode{% endif %}" data-text="{{_('Home')}}" data-textback="{{_('Back')}}">
+    
+    {% set wishlist_shelf = namespace(id=None) %}
+    {% if current_user.is_authenticated %}
+        {% for shelf in g.shelves_access %}
+            {% if shelf.name == "Wishlist" and shelf.is_public == 0 %}
+                {% set wishlist_shelf.id = shelf.id %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    <div class="navbar navbar-default navbar-static-top" role="navigation">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+            <span class="sr-only">{{_('Toggle Navigation')}}</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="{{url_for('web.index')}}">{{instance}}</a>
+        </div>
+        {% if g.current_theme == 1 %}
+            <div class="home-btn"><a class="home-btn-tooltip" href="{{url_for("web.index", page=1)}}" data-toggle="tooltip" title="" data-placement="bottom" data-original-title="Home"></a></div>
+            <div class="plexBack"><a href="{{url_for('web.index')}}"></a></div>
+        {% endif %}
+        {% if current_user.is_authenticated or g.allow_anonymous %}
+          <form class="navbar-form navbar-left" role="search" action="{{url_for('search.simple_search')}}" method="GET">
+            <div class="form-group input-group input-group-sm">
+              <label for="query" class="sr-only">{{_('Search')}}</label>
+              <input type="text" class="form-control" id="query" name="query" placeholder="{{_('Search Library')}}" value="{{searchterm}}">
+              <span class="input-group-btn">
+                <button type="submit" id="query_submit" class="btn btn-default">{{_('Search')}}</button>
+              </span>
+            </div>
+          </form>
+        {% endif %}
+        <div class="navbar-collapse collapse">
+          {% if current_user.is_authenticated or g.allow_anonymous %}
+          <ul class="nav navbar-nav ">
+            <li><a href="{{url_for('search.advanced_search')}}" id="advanced_search"><span class="glyphicon glyphicon-search"></span><span class="hidden-sm"> {{_('Advanced Search')}}</span></a></li>
+            {% if simple==true %} <li><a href="{{url_for('basic.index')}}" id="basic"><span class="glyphicon glyphicon-phone"></span><span>{{_('Simple Theme')}}</span></a><li>{% endif %}
+          </ul>
+          {% endif %}
+          <ul class="nav navbar-nav navbar-right" id="main-nav">
+            {% if current_user.is_authenticated or g.allow_anonymous %}
+              {% if g.current_theme == 1 %}
+              <li class="dropdown"><a href="#" class="dropdown-toggle profileDrop" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false"><span class="glyphicon glyphicon-user"></span></a>
+                <ul class="dropdown-menu profileDropli">
+                    <li><a id="top_user" data-text="{{_('Account')}}" href="{{url_for('web.profile')}}" ><span class="glyphicon glyphicon-user"></span> <span class="hidden-sm">{{current_user.name}}</span></a></li>
+                    {% if g.allow_registration and not current_user.is_authenticated %}
+                    <li><a id="login" href="{{url_for('web.login')}}"><span class="glyphicon glyphicon-log-in"></span> {{_('Login')}}</a></li>
+                    <li><a id="register" href="{{url_for('web.register')}}"><span class="glyphicon glyphicon-user"></span> {{_('Register')}}</a></li>
+                    {% endif %}
+                    {% if not current_user.is_anonymous %}
+                    <li><a id="logout" href="{{url_for('web.logout', next=(request.path + "?" + request.query_string.decode("utf-8")).rstrip("?"))}}"><span class="glyphicon glyphicon-log-out"></span> <span class="hidden-sm">{{_('Logout')}}</span></a></li>
+                    {% endif %}
+                </ul>
+              </li>
+              {% endif %}
+              {% if current_user.role_upload() and g.allow_upload %}
+                  <li>
+                    <form id="form-upload" class="navbar-form" action="{{ url_for('edit-book.upload') }}" data-title="{{_('Uploading...')}}" data-footer="{{_('Close')}}" data-failed="{{_('Error')}}" data-message="{{_('Upload done, processing, please wait...')}}" method="post" enctype="multipart/form-data">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <div class="form-group">
+                        <span class="btn btn-default btn-file">{{_('Upload')}}<input id="btn-upload" name="btn-upload"
+                        type="file" accept="{% for format in accept %}.{% if format != ''%}{{format}}{% else %}*{% endif %}{{ ',' if not loop.last }}{% endfor %}" multiple></span>
+                        <input class="hide" id="btn-upload2" name="btn-upload2" type="file" accept="{% for format in accept %}.{% if format != ''%}{{format}}{% else %}*{% endif %}{{ ',' if not loop.last }}{% endfor %}">
+                      </div>
+                    </form>
+                  </li>
+              {% endif %}
+             
+              {% if current_user.role_admin() %}
+                <li><a id="top_admin" data-text="{{_('Settings')}}" href="{{url_for('admin.admin')}}"><span class="glyphicon glyphicon-dashboard"></span> <span class="hidden-sm">{{_('Admin')}}</span></a></li>
+              {% endif %}
+              {% if g.current_theme == 0 %}
+              <li><a id="top_user" data-text="{{_('Account')}}" href="{% if not current_user.is_anonymous %}{{url_for('web.profile')}}{% else %}{{url_for('web.login', next=(request.path + "?" + request.query_string.decode("utf-8")).rstrip("?"))}}{% endif %}"><span class="glyphicon glyphicon-user"></span> <span class="hidden-sm">{{current_user.name}}</span></a></li>
+                {% if not current_user.is_anonymous %}
+                <li><a id="logout" href="{{url_for('web.logout', next=(request.path + "?" + request.query_string.decode("utf-8")).rstrip("?"))}}"><span class="glyphicon glyphicon-log-out"></span> <span class="hidden-sm">{{_('Logout')}}</span></a></li>
+                {% endif %}
+              {% endif %}
+            {% endif %}
+            {% if g.allow_registration and not current_user.is_authenticated and g.current_theme == 0 %}
+            <li><a id="login" href="{{url_for('web.login')}}"><span class="glyphicon glyphicon-log-in"></span> {{_('Login')}}</a></li>
+            <li><a id="register" href="{{url_for('web.register')}}"><span class="glyphicon glyphicon-user"></span> {{_('Register')}}</a></li>
+            {% endif %}
+          </ul>
+        </div></div>
+    </div>
+    {% for message in get_flashed_messages(with_categories=True) %}
+      {%if message[0] == "error" %}
+      <div class="row-fluid text-center" >
+        <div id="flash_danger" class="alert alert-danger">{{ message[1] }}</div>
+      </div>
+      {%endif%}
+      {%if message[0] == "info" %}
+      <div class="row-fluid text-center">
+        <div id="flash_info" class="alert alert-info">{{ message[1] }}</div>
+      </div>
+      {%endif%}
+      {%if message[0] == "warning" %}
+      <div class="row-fluid text-center">
+        <div id="flash_warning" class="alert alert-warning">{{ message[1] }}</div>
+      </div>
+      {%endif%}
+      {%if message[0] == "success" %}
+      <div class="row-fluid text-center">
+        <div id="flash_success" class="alert alert-success">{{ message[1] }}</div>
+      </div>
+      {%endif%}
+    {% endfor %}
+    {% block flash %}{% endblock %}
+    {% if g.current_theme == 1 %}
+      <div id="loader" hidden="true">
+        <center>
+          <h3>{{_('Uploading...')}}</h3>
+          <span>{{_("Please do not refresh the page")}}</span>.
+        </center>
+      </div>
+    {%endif%}
+
+    <div class="container-fluid">
+      <div class="row-fluid">
+        {% if current_user.is_authenticated or g.allow_anonymous %}
+        <div class="col-sm-2">
+          <nav class="navigation">
+            <ul class="list-unstyled" id="scnd-nav" intent in-standard-append="nav.navigation" in-mobile-after="#main-nav" in-mobile-class="nav navbar-nav">
+              <li class="nav-head hidden-xs" style="margin-bottom: -5px;">{{_('Browse')}}</li>
+
+              {# 1. ALL BOOKS #}
+              {% for el in sidebar %}
+                  {% if el['link'] == 'web.index' and current_user.check_visibility(el['visibility']) and el['public'] %}
+                  <li id="nav_{{el['id']}}" {% if page == 'newest' or page == 'index' %}class="active"{% endif %}>
+                      <a href="{{url_for('web.books_list', data='newest', sort_param='stored')}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
+                      <span class="glyphicon {{el['glyph']}}" style="margin-right: 8px; flex-shrink: 0;"></span>
+                      <span>{{_('All Books')}}</span>
+                      </a>
+                  </li>
+                  {% endif %}
+              {% endfor %}
+
+              {# 2. CURRENTLY READING #}
+              <li id="nav_currently_reading" {% if page == 'currently_reading' %}class="active"{% endif %}>
+                  <a href="{{url_for('web.books_list', data='currently_reading', sort_param='stored')}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
+                  <span class="glyphicon glyphicon-book" style="margin-right: 8px; flex-shrink: 0; color: #007bff;"></span>
+                  <span>{{_('Currently Reading')}}</span>
+                  </a>
+              </li>
+
+              {# 3. WISHLIST #}
+              {% if wishlist_shelf.id %}
+              <li {% if page == 'shelf' and shelf.id == wishlist_shelf.id %}class="active"{% endif %}>
+                  <a href="{{url_for('shelf.show_shelf', shelf_id=wishlist_shelf.id)}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
+                  <span class="glyphicon glyphicon-heart" style="margin-right: 8px; flex-shrink: 0; color: #d9534f;"></span>
+                  <span>{{_('Wishlist')}}</span>
+                  </a>
+              </li>
+              {% endif %}
+
+              {# 4. CATEGORIES #}
+              {% for el in sidebar %}
+                  {% if el['page'] == 'category' and current_user.check_visibility(el['visibility']) and el['public'] %}
+                  <li id="nav_{{el['id']}}" {% if page == 'category' %}class="active"{% endif %}>
+                      <a href="{{url_for(el['link'], data=el['page'], sort_param='stored')}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
+                      <span class="glyphicon glyphicon-tags" style="margin-right: 3px; flex-shrink: 0; color: #444 !important;"></span>
+                      <span>{{_(el['text'])}}</span>
+                      </a>
+                  </li>
+                  {% endif %}
+              {% endfor %}
+
+              {# 5. DISCOVER #}
+              {% for el in sidebar %}
+                  {% if el['page'] == 'discover' and current_user.check_visibility(el['visibility']) and el['public'] %}
+                  <li id="nav_{{el['id']}}" {% if page == 'discover' %}class="active"{% endif %}>
+                      <a href="{{url_for(el['link'], data=el['page'], sort_param='stored')}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
+                      <span class="glyphicon {{el['glyph']}}" style="margin-right: 8px; flex-shrink: 0;"></span>
+                      <span>{{_(el['text'])}}</span>
+                      </a>
+                  </li>
+                  {% endif %}
+              {% endfor %}
+
+              {# 6. SERIES #}
+              {% for el in sidebar %}
+                  {% if el['page'] == 'series' and current_user.check_visibility(el['visibility']) and el['public'] %}
+                  <li id="nav_{{el['id']}}" {% if page == 'series' %}class="active"{% endif %}>
+                      <a href="{{url_for(el['link'], data=el['page'], sort_param='stored')}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
+                      <span class="glyphicon {{el['glyph']}}" style="margin-right: 8px; flex-shrink: 0;"></span>
+                      <span>{{_(el['text'])}}</span>
+                      </a>
+                  </li>
+                  {% endif %}
+              {% endfor %}
+
+              {# 7. BOX SETS #}
+              {% for el in sidebar %}
+                  {% if el['page'] == 'series' and current_user.check_visibility(el['visibility']) and el['public'] %}
+                  <li id="nav_boxsets" {% if page == 'boxsets' %}class="active"{% endif %}>
+                      <a href="{{url_for('web.books_list', data='boxsets', sort_param='stored')}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
+                      <span class="glyphicon glyphicon-stats" style="margin-right: 8px; flex-shrink: 0;"></span>
+                      <span>{{_('Box Sets')}}</span>
+                      </a>
+                  </li>
+                  {% endif %}
+              {% endfor %}
+
+              {# 8. TOP RATED #}
+              {% for el in sidebar %}
+                  {% if el['page'] == 'top' and current_user.check_visibility(el['visibility']) and el['public'] %}
+                  <li id="nav_{{el['id']}}" {% if page == 'top' %}class="active"{% endif %}>
+                      <a href="{{url_for(el['link'], data=el['page'], sort_param='stored')}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
+                      <span class="glyphicon {{el['glyph']}}" style="margin-right: 8px; flex-shrink: 0;"></span>
+                      <span>{{_(el['text'])}}</span>
+                      </a>
+                  </li>
+                  {% endif %}
+              {% endfor %}
+
+              {# 9. RATINGS #}
+              {% for el in sidebar %}
+                  {% if el['page'] == 'ratings' and current_user.check_visibility(el['visibility']) and el['public'] %}
+                  <li id="nav_{{el['id']}}" {% if page == 'ratings' %}class="active"{% endif %}>
+                      <a href="{{url_for(el['link'], data=el['page'], sort_param='stored')}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
+                      <span class="glyphicon {{el['glyph']}}" style="margin-right: 8px; flex-shrink: 0;"></span>
+                      <span>{{_(el['text'])}}</span>
+                      </a>
+                  </li>
+                  {% endif %}
+              {% endfor %}
+
+              {# 10. DOWNLOADED (HOT) #}
+              {% for el in sidebar %}
+                  {% if el['page'] == 'hot' and current_user.check_visibility(el['visibility']) and el['public'] %}
+                  <li id="nav_{{el['id']}}" {% if page == 'hot' %}class="active"{% endif %}>
+                      <a href="{{url_for(el['link'], data=el['page'], sort_param='stored')}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
+                      <span class="glyphicon {{el['glyph']}}" style="margin-right: 8px; flex-shrink: 0;"></span>
+                      <span>{{_('Downloaded')}}</span>
+                      </a>
+                  </li>
+                  {% endif %}
+              {% endfor %}
+
+              {# 11. REMAINING FALLBACK ITEMS (Authors, Publishers, Languages, etc) #}
+              {% set explicitly_placed = ['category', 'discover', 'series', 'top', 'ratings', 'hot'] %}
+              {% for el in sidebar %}
+                  {% if el['page'] not in explicitly_placed and el['link'] != 'web.index' and current_user.check_visibility(el['visibility']) and el['public'] %}
+                      <li id="nav_{{el['id']}}" {% if page == el['page'] %}class="active"{% endif %}>
+                          <a href="{{url_for(el['link'], data=el['page'], sort_param='stored')}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
+                          <span class="glyphicon {{el['glyph']}}" style="margin-right: 8px; flex-shrink: 0;"></span>
+                          <span>{{_(el['text'])}}</span>
+                          </a>
+                      </li>
+                  {% endif %}
+              {% endfor %}
+
+              {# 12. COMPLETED BOOKS #}
+              <li id="nav_completed" {% if page == 'read' %}class="active"{% endif %}>
+                  <a href="{{url_for('web.books_list', data='read', sort_param='stored')}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
+                  <span class="glyphicon glyphicon-check" style="margin-right: 8px; flex-shrink: 0; color: #5cb85c;"></span>
+                  <span>{{_('Completed')}}</span>
+                  </a>
+              </li>
+
+              {% if current_user.is_authenticated or g.allow_anonymous %}
+                
+                <li class="nav-head hidden-xs" style="display: flex; justify-content: space-between; align-items: center; padding-right: 0px; margin-bottom: 0px;">
+                <span style="font-size: 0.9em;">{{_('Private Shelves')}}</span>
+                <div class="dropdown">
+                  <a href="#" class="dropdown-toggle" data-toggle="dropdown" style="color: inherit; outline: none; padding: 0;">
+                    <span class="glyphicon glyphicon-cog" style="font-size: 11px;"></span>
+                  </a>
+                  <ul class="dropdown-menu dropdown-menu-right" style="z-index: 9999;">
+                    <li><a href="{{url_for('shelf.create_shelf')}}">{{_('Create a New Shelf')}}</a></li>
+                  </ul>
+                </div>
+              </li>
+              {% for shelf in g.shelves_access %}
+                {% if shelf.is_public != 1 %}
+                  {% if shelf.name != "Wishlist" %}
+                  <li>
+                    {% if shelf.search_args %}
+                      {% set separator = "&" if "?" in shelf.search_args else "?" %}
+                      <a href="{{ shelf.search_args }}{{ separator }}smart_shelf={{ shelf.id }}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; font-size: 0.9em; padding: 5px 10px; color: inherit;">
+                        <span class="glyphicon glyphicon-flash shelf" style="margin-right: 8px; flex-shrink: 0;"></span>
+                        <span>{{shelf.name|shortentitle(30)}}</span>
+                      </a>
+                    {% else %}
+                      <a href="{{url_for('shelf.show_shelf', shelf_id=shelf.id)}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; font-size: 0.9em; padding: 5px 10px; color: inherit;">
+                        <span class="glyphicon glyphicon-list shelf" style="margin-right: 8px; flex-shrink: 0;"></span>
+                        <span>{{shelf.name|shortentitle(30)}}</span>
+                      </a>
+                    {% endif %}
+                  </li>
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+
+                <li class="nav-head hidden-xs" style="display: flex; justify-content: space-between; align-items: center; padding-right: 0px; margin-top: 10px; margin-bottom: 0px;">
+                <span style="font-size: 0.9em;">{{_('Public Shelves')}}</span>
+                <div class="dropdown">
+                  <a href="#" class="dropdown-toggle" data-toggle="dropdown" style="color: inherit; outline: none; padding: 0;">
+                    <span class="glyphicon glyphicon-cog" style="font-size: 11px;"></span>
+                  </a>
+                  <ul class="dropdown-menu dropdown-menu-right" style="z-index: 9999;">
+                    <li><a href="{{url_for('shelf.create_shelf', is_public=1)}}">{{_('Create a New Shelf')}}</a></li>
+                  </ul>
+                </div>
+              </li>
+              {% for shelf in g.shelves_access %}
+                {% if shelf.is_public == 1 %}
+                  <li>
+                    {% if shelf.search_args %}
+                      {% set separator = "&" if "?" in shelf.search_args else "?" %}
+                      <a href="{{ shelf.search_args }}{{ separator }}smart_shelf={{ shelf.id }}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; font-size: 0.9em; padding: 5px 10px; color: inherit;">
+                        <span class="glyphicon glyphicon-flash shelf" style="margin-right: 8px; flex-shrink: 0;"></span>
+                        <span>{{shelf.name|shortentitle(30)}}</span>
+                      </a>
+                    {% else %}
+                      <a href="{{url_for('shelf.show_shelf', shelf_id=shelf.id)}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; font-size: 0.9em; padding: 5px 10px; color: inherit;">
+                        <span class="glyphicon glyphicon-globe shelf" style="margin-right: 8px; flex-shrink: 0;"></span>
+                        <span>{{shelf.name|shortentitle(30)}}</span>
+                      </a>
+                    {% endif %}
+                  </li>
+                {% endif %}
+              {% endfor %}
+
+                {% if not current_user.is_anonymous %}
+                   <li class="divider" style="border-top: 2px solid currentColor; opacity: 0.2; margin: 15px 10px; list-style: none;"></li>
+                   <li>
+                       <a href="#" id="toggle-eink-mode" style="color: inherit;">
+                           <span class="glyphicon glyphicon-{% if request.cookies.get('cw_eink_mode') == '1' %}check{% else %}unchecked{% endif %}"></span> {{_('E-Ink Mode')}}
+                       </a>
+                   </li>
+                   <li id="nav_about" {% if page == 'stat' %}class="active"{% endif %}><a href="{{url_for('about.stats')}}"><span class="glyphicon glyphicon-info-sign"></span> {{_('About')}}</a></li>
+                {% endif %}
+              {% endif %}
+
+            </ul>
+          </nav>
+        </div>
+        {% endif %}
+        
+        <div class="col-sm-10">
+          {% block body %}{% endblock %}
+          {% if pagination and (pagination.has_next or pagination.has_prev) %}
+            <div class="pagination">
+              {% if pagination.has_prev %}
+              <li class="page-item page-previous"><a class="page-link" aria-label="next page" href="{{ (pagination.page - 1)|url_for_other_page
+                }}">&laquo; {{_('Previous')}}</a></li>
+              {% endif %}
+            {% for page in pagination.iter_pages() %}
+              {% if page %}
+                {% if page != pagination.page %}
+                  <li class="page-item"><a class="page-link" aria-label="to page {{ page }}" href="{{ (page)|url_for_other_page }}">{{ page }}</a></li>
+                {% else %}
+                  <li class="page-item active"><a class="page-link" aria-label="to page {{ page }}" href="{{ (page)|url_for_other_page }}">{{ page }}</a></li>
+                {% endif %}
+              {% else %}
+                <li class="page-item page-last-separator disabled"><a class="page-link" aria-label="">…</a></li>
+              {% endif %}
+            {% endfor %}
+            {% if pagination.has_next %}
+              <li class="page-item page-next"><a class="page-link next" aria-label="next page" href="{{ (pagination.page + 1)|url_for_other_page
+                }}">{{_('Next')}} &raquo;</a></li>
+            {% endif %}
+            </div>
+          {% endif %}
+      </div>
+    </div>
+  </div>
+    <div class="modal fade" id="bookDetailsModal" tabindex="-1" role="dialog" aria-labelledby="bookDetailsModalLabel">
+      <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title" id="bookDetailsModalLabel">{{_('Book Details')}}</h4>
+          </div>
+          <div class="modal-body">...</div>
+          <div class="modal-footer">
+            <button type="button" id="details_close" class="btn btn-default" data-dismiss="modal">{{_('Close')}}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% block modal %}{% endblock %}
+    <script src="{{ url_for('static', filename='js/libs/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/libs/bootstrap.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/libs/underscore-umd-min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/libs/intention.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/libs/context.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/libs/plugins.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/libs/jquery.form.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/uploadprogress.js') }}"> </script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <script>
+        // Expose Wishlist ID to other scripts (Index/Detail)
+        window.wishlistId = {% if wishlist_shelf.id %}{{ wishlist_shelf.id }}{% else %}null{% endif %};
+
+        $(document).ready(function() {
+            var $overlay = $('#pagination-loading-overlay');
+            var $title = $('#pagination-title');
+            var $text = $('#pagination-loading-text');
+
+            // --- LOADING OVERLAY LOGIC ---
+            function showOverlay(titleMsg, textMsg) {
+                $title.text(titleMsg);
+                $text.text(textMsg);
+                $overlay.css('display', 'flex'); // Flex is required for the new overlay centering
+            }
+            function forceHide() { $overlay.css('display', 'none'); }
+            forceHide();
+            window.addEventListener('pageshow', forceHide);
+
+            $('#query_submit').on('click', function() {
+                showOverlay("{{_('Searching Library...')}}", "{{_('Please wait while we look through your books.')}}");
+            });
+
+            $('form').on('submit', function() {
+                var action = $(this).attr('action') || '';
+                if (action.indexOf('search') !== -1 || $(this).attr('role') === 'search') {
+                    showOverlay("{{_('Searching Library...')}}", "{{_('Please wait while we look through your books.')}}");
+                }
+            });
+
+            $('.navigation a').on('click', function() {
+                var $this = $(this);
+                if ($this.hasClass('dropdown-toggle')) return;
+                
+                var title = "{{_('Loading...')}}";
+                var text = "{{_('Please wait...')}}";
+                
+                // Specific text for Wishlist
+                if ($this.find('.glyphicon-heart').length > 0) {
+                     title = "{{_('Loading Wishlist...')}}";
+                     text = "{{_('Fetching your selected books.')}}";
+                } else if ($this.find('.shelf').length > 0) {
+                    title = "{{_('Loading Shelf...')}}";
+                    text = "{{_('Getting your books from the shelf.')}}";
+                } else {
+                    title = "{{_('Loading Library...')}}";
+                    text = "{{_('Please be patient while we retrieve the books.')}}";
+                }
+                showOverlay(title, text);
+            });
+
+            // --- GLOBAL COOKIE HELPER & E-INK TOGGLE ---
+            function setCookie(name, value, days) {
+                var expires = "";
+                if (days) {
+                    var date = new Date();
+                    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                    expires = "; expires=" + date.toUTCString();
+                }
+                document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+            }
+
+            function getCookie(name) {
+                var nameEQ = name + "=";
+                var ca = document.cookie.split(';');
+                for(var i=0; i < ca.length; i++) {
+                    var c = ca[i];
+                    while (c.charAt(0)==' ') c = c.substring(1,c.length);
+                    if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+                }
+                return null;
+            }
+
+            $('#toggle-eink-mode').click(function(e) {
+                e.preventDefault();
+                var current = getCookie('cw_eink_mode');
+                setCookie('cw_eink_mode', current === '1' ? '0' : '1', 365);
+                window.location.reload();
+            });
+        });
+    </script>
+
+    {% if g.current_theme == 1 %}
+      <script src="{{ url_for('static', filename='js/libs/jquery.visible.min.js') }}"></script>
+      <script src="{{ url_for('static', filename='js/libs/compromise.min.js') }}"></script>
+      <script src="{{ url_for('static', filename='js/libs/readmore.min.js') }}"></script>
+      <script src="{{ url_for('static', filename='js/caliBlur.js') }}"></script>
+    {% endif %}
+    {% block js %}{% endblock %}
+    
+    <div id="pagination-loading-overlay">
+        <div class="loading-box">
+            <div class="spinner-blue"></div>
+            <h3 id="pagination-title">{{ _('Loading...') }}</h3>
+            <p id="pagination-loading-text"></p>
+        </div>
+    </div>
+
+    <script>
+        $(window).on('pageshow', function(event) {
+            $('#pagination-loading-overlay').css('display', 'none');
+        });
+    </script>
+  </body>
+</html>

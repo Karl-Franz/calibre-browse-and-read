@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <title>{{_('DJVU Reader')}} | {{title}}</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    {% if g.google_site_verification|length > 0 %}
+      <meta name="google-site-verification" content="{{g.google_site_verification}}">
+    {% endif %}  
+
+    <link rel="apple-touch-icon" sizes="140x140" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='css/libs/Djvu_html5.css') }}">
+    <script src="{{ url_for('static', filename='js/libs/djvu_html5/djvu_html5/djvu_html5.nocache.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/reading/djvu_reader.js') }}"></script>
+  </head>
+  <body>
+    <a id="exit" 
+      href="{{ url_for('web.show_book', book_id=djvufile) }}" 
+      onclick="window.close();" 
+      style="position: fixed; top: 15px; right: 15px; z-index: 1000; background: rgba(0,0,0,0.5); color: #fff; padding: 8px 12px; border-radius: 4px; text-decoration: none; font-family: sans-serif; cursor: pointer;">
+        {{_('Close')}}
+    </a>
+	<div id="djvuContainer" file="{{ url_for('web.serve_book', book_id=djvufile, book_format=extension) }}"></div>
+  </body>
+</html>

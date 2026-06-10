@@ -1,0 +1,1886 @@
+<!DOCTYPE html>
+<html lang="{{ current_user.locale }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="color-scheme" content="light dark">
+    <title>{{ title }}</title>
+    
+    <script src="{{ url_for('static', filename='js/libs/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/compress/jszip_epub.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/libs/epub.min.js') }}"></script>
+
+    <style>
+        body {
+            margin: 0; padding: 0; overflow: hidden; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            transition: background-color 0.3s ease;
+        }
+
+        body.theme-light { background-color: #ffffff; }
+        body.theme-sepia { background-color: #f4ecd8; }
+        body.theme-dark { background-color: #121212; }
+        body.theme-slate { background-color: #1e1e2e; }
+
+        #reader-loading {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: #ffffff; z-index: 9999; display: flex;
+            justify-content: center; align-items: center; flex-direction: column;
+            transition: opacity 0.3s ease;
+        }
+        body.theme-dark #reader-loading, body.theme-slate #reader-loading { background: #121212; color: #ddd; }
+        body.theme-sepia #reader-loading { background: #f4ecd8; color: #5b4636; }
+        
+        .spinner {
+            border: 4px solid rgba(0,0,0,0.1); border-top: 4px solid #007bff;
+            border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- HEADER & FOOTER LAYOUT --- */
+        #reader-header {
+            position: fixed; top: 0; left: 0; right: 0; height: 50px;
+            background: rgba(255, 255, 255, 0.95); border-bottom: 1px solid #ddd;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 15px; z-index: 1000; transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+        #reader-header.hidden { transform: translateY(-100%); }
+
+        #reader-footer {
+            position: fixed; bottom: 0; left: 0; right: 0; height: 100px; 
+            box-sizing: border-box; padding: 0 15px 40px 15px; 
+            background: rgba(255, 255, 255, 0.90); border-top: 1px solid rgba(0,0,0,0.1);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000; transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+        #reader-footer.hidden { transform: translateY(100%); }
+        
+        .header-btn {
+            background: none; border: none; font-size: 16px; font-weight: 500;
+            color: #007bff; cursor: pointer; text-decoration: none; padding: 5px 10px;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .header-btn svg { margin-bottom: 2px; transition: fill 0.2s ease; }
+        
+        .footer-btn {
+            background: none; border: none; padding: 5px 8px; margin: 0 2px;
+            color: #666; cursor: pointer; transition: color 0.2s ease, transform 0.1s;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .footer-btn:hover { color: #333; transform: scale(1.1); }
+        .footer-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+        .book-title {
+            font-size: 16px; font-weight: 600; color: #333;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 35vw;
+        }
+
+        #viewer { position: absolute; top: 50px; bottom: 0; left: 0; right: 0; overflow: hidden; }
+
+        .nav-btn {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.05); border: 1px solid rgba(0,0,0,0.1); 
+            border-radius: 50%; width: 44px; height: 44px; font-size: 20px; color: #555;
+            cursor: pointer; z-index: 100; display: flex;
+            justify-content: center; align-items: center; transition: all 0.2s ease;
+        }
+        .nav-btn:hover:not(:disabled) { background: rgba(0, 0, 0, 0.15); color: #000; transform: translateY(-50%) scale(1.05); }
+        .nav-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+        #btn-prev { left: 15px; }
+        #btn-next { right: 15px; }
+
+        /* --- SIDEBAR & TABS --- */
+        #toc-menu {
+            position: fixed; top: 50px; left: -400px; bottom: 100px; width: 400px;
+            background: #f9f9f9; border-right: 1px solid #ddd; z-index: 999;
+            transition: left 0.3s ease; box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            display: flex; flex-direction: column;
+        }
+        #toc-menu.open { left: 0; }
+        
+        .sidebar-tabs { display: flex; border-bottom: 1px solid #ddd; background: #eee; flex-shrink: 0; }
+        .tab-btn { flex: 1; padding: 12px 5px; border: none; background: transparent; cursor: pointer; font-size: 13px; font-weight: 600; color: #666; outline: none; transition: all 0.2s ease; }
+        .tab-btn:hover { color: #333; }
+        .tab-btn.active { background: #fff; color: #007bff; border-bottom: 2px solid #007bff; }
+        
+        .tab-content { display: none; flex: 1; overflow-y: auto; padding: 10px 0; }
+        .tab-content.active { display: block; }
+
+        .toc-list { list-style: none; padding: 0; margin: 0; }
+        .toc-list li { border-bottom: 1px solid #eee; position: relative; }
+        .toc-list a { display: block; padding: 8px 20px; color: #333; text-decoration: none; font-size: 14px; line-height: 1.4; }
+        .toc-list a:hover { background: #f0f0f0; }
+        
+        .btn-delete-ann { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #dc3545; font-size: 18px; cursor: pointer; opacity: 0.5; transition: opacity 0.2s; }
+        .btn-delete-ann:hover { opacity: 1; }
+
+        /* --- MENUS & MODALS --- */
+        #settings-menu {
+            position: fixed; top: 60px; right: 15px; width: 300px;
+            background: #fff; border-radius: 8px; border: 1px solid #ccc;
+            padding: 15px; z-index: 1001; display: none;
+        }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .setting-row:last-child { margin-bottom: 0; }
+        .setting-label { font-size: 14px; color: #555; font-weight: 600; }
+        .setting-note { font-size: 12px; color: #888; font-weight: normal; font-style: italic; }
+        
+        /* Explicitly set text and background color to override Safari defaults */
+        .theme-btn, .font-btn {
+            background: #fff; color: #333; border: 1px solid #ccc; padding: 6px 12px;
+            border-radius: 4px; cursor: pointer; font-size: 14px; margin-left: 5px;
+        }
+        .theme-btn.active { border-color: #007bff; color: #007bff; background: #e6f2ff; }
+        select.font-btn { padding: 5px; width: 140px; }
+
+        #highlight-toolbar {
+            display: none; position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
+            background: #222; padding: 12px 24px; border-radius: 30px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 2000; align-items: center; gap: 15px;
+        }
+        .color-btn { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; cursor: pointer; transition: transform 0.1s; }
+        .color-btn:hover { transform: scale(1.1); }
+        .color-btn[data-color="yellow"] { background: #ffff00; }
+        .color-btn[data-color="green"] { background: #00ff00; }
+        .color-btn[data-color="red"] { background: #ff0000; }
+        .color-btn[data-color="blue"] { background: #0000ff; }
+
+        #annotation-modal {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #ccc;
+            z-index: 2001; width: 320px;
+        }
+        #ann-text { font-style: italic; font-size: 14px; color: #666; max-height: 100px; overflow-y: auto; margin-bottom: 15px; padding-left: 10px; border-left: 3px solid #ccc; }
+        
+        /* Modal Color Picker Buttons */
+        .modal-color-btn { opacity: 1 !important; border: 2px solid #ccc; transition: transform 0.2s, border-color 0.2s; }
+        .modal-color-btn.selected { border-color: #333; transform: scale(1.25) !important; }
+        body.theme-dark .modal-color-btn.selected, body.theme-slate .modal-color-btn.selected { border-color: #fff; }
+        
+        #ann-note { width: 100%; height: 80px; margin-bottom: 15px; font-family: inherit; padding: 8px; border: 1px solid #ccc; border-radius: 4px; resize: none; background: #fff; color: #333; }
+        .modal-btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        #btn-ann-delete { background: #dc3545; color: white; }
+        #btn-ann-cancel { background: #e0e0e0; color: #333; margin-right: 5px; }
+        #btn-ann-save { background: #007bff; color: white; }
+
+        /* --- SLIDER & SCROLLBAR --- */
+        #slider-wrapper {
+            flex: 1; position: relative; height: 40px; 
+            margin: 0 10px; display: flex; align-items: center; 
+        }
+        
+        #progress-slider {
+            -webkit-appearance: none; width: 100%; height: 6px;
+            background: #ddd; border-radius: 3px; outline: none; z-index: 1;
+            touch-action: none; 
+        }
+        #progress-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 8px; height: 24px; border-radius: 4px;
+            background: #007bff; cursor: pointer; position: relative; z-index: 5;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        #progress-slider:disabled { opacity: 0.5; cursor: wait; }
+        
+        #tick-marks-container {
+            position: absolute; top: 0; left: 0; right: 0;
+            height: 100%; pointer-events: none; z-index: 2;
+        }
+        
+        .tick-mark {
+            position: absolute; top: 6px; width: 8px; height: 8px; 
+            border-radius: 50%; transform: translateX(-50%);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3); opacity: 1 !important;
+        }
+        
+        .tick-mark-bookmark {
+            position: absolute; top: 14px; width: 3px; height: 6px; 
+            background-color: #555; border-radius: 1px;
+            transform: translateX(-50%); z-index: 1;
+        }
+
+        /* --- INVISIBLE NAV TAP ZONES --- */
+        .tap-zone {
+            position: fixed; top: 70px; bottom: 100px; width: 25%; z-index: 50;
+            cursor: pointer; display: none; 
+            -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            outline: none;
+        }
+        #tap-zone-left { left: 0; }
+        #tap-zone-right { right: 0; }
+        
+        /* --- ANNOTATION LOADING OVERLAY --- */
+        #annotation-loading-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.85); z-index: 2000;
+            display: flex; justify-content: center; align-items: center;
+            padding-top: 20px; /* Pushes the text safely away from the top edge */
+            padding-bottom: 40px; /* Keeps it visually balanced over the slider */
+            box-sizing: border-box; 
+            font-size: 13px; font-weight: bold; color: #555;
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        }
+        /* Theme Support */
+        body.theme-dark #annotation-loading-overlay, body.theme-slate #annotation-loading-overlay {
+            background: rgba(30, 30, 30, 0.85); color: #aaa;
+        }
+        body.theme-sepia #annotation-loading-overlay {
+            background: rgba(244, 236, 216, 0.85); color: #7b6656;
+        }
+        
+        /* --- SVG UNDERLINE FIX --- */
+        g.hl {
+            opacity: 1 !important;
+            mix-blend-mode: normal !important;
+        }
+        g.hl line {
+            stroke: currentcolor !important;
+            stroke-width: 3px !important;
+            stroke-linecap: round !important;
+            stroke-opacity: 1 !important;
+        }
+        g.hl rect {
+            stroke: none !important;
+            fill: transparent !important;
+        }
+
+        /* --- MENU UI & MODES --- */
+        .mode-toggle { display: flex; background: #eee; border-radius: 8px; padding: 4px; margin-bottom: 20px; }
+        .mode-toggle label { flex: 1; text-align: center; padding: 8px 0; font-size: 13px; font-weight: bold; color: #888; cursor: pointer; border-radius: 6px; margin: 0; transition: all 0.2s ease; }
+        .mode-toggle input[type="radio"] { display: none; }
+        .mode-toggle input[type="radio"]:checked + label { background: #fff; color: #007bff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .disabled-row { opacity: 0.4; pointer-events: none; filter: grayscale(100%); }
+        .menu-section-title { font-size: 11px; text-transform: uppercase; color: #999; font-weight: bold; letter-spacing: 1px; margin-bottom: 10px; margin-top: 15px; }
+
+        /* OS-Level Dropdown Dark Mode */
+        select.font-btn { color-scheme: light; }
+        body.theme-dark select.font-btn, body.theme-slate select.font-btn { color-scheme: dark; background: #333; color: #ddd; border-color: #555; }
+
+        /* --- THEME OVERRIDES --- */
+        body.theme-dark .mode-toggle, body.theme-slate .mode-toggle { background: #1a1a1a; }
+        body.theme-dark .mode-toggle input[type="radio"]:checked + label, body.theme-slate .mode-toggle input[type="radio"]:checked + label { background: #333; color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        
+        body.theme-dark #reader-header, body.theme-dark #reader-footer, body.theme-slate #reader-header, body.theme-slate #reader-footer { background: rgba(30, 30, 30, 0.95); border-color: #333; }
+        body.theme-dark .book-title, body.theme-slate .book-title { color: #ddd; }
+        body.theme-dark #toc-menu, body.theme-slate #toc-menu { background: #1e1e1e; border-color: #333; }
+        body.theme-dark .toc-list a, body.theme-slate .toc-list a { color: #ccc; }
+        body.theme-dark .toc-list li, body.theme-slate .toc-list li { border-bottom-color: #333; }
+        body.theme-dark .toc-list a:hover, body.theme-slate .toc-list a:hover { background: #2a2a2a; }
+        
+        body.theme-dark .sidebar-tabs, body.theme-slate .sidebar-tabs { background: #222; border-bottom-color: #333; }
+        body.theme-dark .tab-btn, body.theme-slate .tab-btn { color: #aaa; }
+        body.theme-dark .tab-btn.active, body.theme-slate .tab-btn.active { background: #1e1e1e; color: #45b29d; border-bottom-color: #45b29d; }
+
+        body.theme-dark #settings-menu, body.theme-slate #settings-menu { background: #222; border-color: #333; }
+        body.theme-dark .setting-label, body.theme-slate .setting-label { color: #aaa; }
+        body.theme-dark #settings-menu label, body.theme-slate #settings-menu label { color: #aaa; }
+        input[type="checkbox"] { accent-color: #007bff; }
+        body.theme-dark input[type="checkbox"], body.theme-slate input[type="checkbox"] { accent-color: #45b29d; }
+        body.theme-dark .theme-btn, body.theme-dark .font-btn, body.theme-slate .theme-btn, body.theme-slate .font-btn { background: #333; border-color: #444; color: #ddd; }
+        body.theme-dark .nav-btn, body.theme-slate .nav-btn { background: rgba(255, 255, 255, 0.05); border-color: rgba(255,255,255,0.1); color: #aaa; }
+        body.theme-dark .nav-btn:hover, body.theme-slate .nav-btn:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
+        body.theme-dark #annotation-modal, body.theme-slate #annotation-modal { background: #222; color: #ddd; border: 1px solid #444; }
+        body.theme-dark #ann-note, body.theme-slate #ann-note { background: #333; color: #fff; border-color: #555; }
+        body.theme-dark #btn-ann-cancel, body.theme-slate #btn-ann-cancel { background: #444; color: #ddd; }
+
+        body.theme-dark #progress-slider, body.theme-slate #progress-slider { background: #555; }
+        body.theme-dark .footer-btn, body.theme-slate .footer-btn { color: #aaa; }
+        body.theme-dark .footer-btn:hover, body.theme-slate .footer-btn:hover { color: #fff; }
+        body.theme-dark .tick-mark-bookmark, body.theme-slate .tick-mark-bookmark { background-color: #999; }
+        body.theme-dark .setting-note, body.theme-slate .setting-note { color: #777; }
+
+        body.theme-sepia #reader-header, body.theme-sepia #reader-footer { background: rgba(244, 236, 216, 0.95); border-color: #e0d5ba; }
+        body.theme-sepia #toc-menu { background: #fcf8f2; border-right-color: #e0d5ba; }
+        body.theme-sepia .toc-list li { border-bottom-color: #e0d5ba; }
+        body.theme-sepia .toc-list a:hover { background: #f4ecd8; }
+        
+        body.theme-sepia .sidebar-tabs { background: #e8dcc3; border-bottom-color: #d1c1a3; }
+        body.theme-sepia .tab-btn { color: #7b6656; }
+        body.theme-sepia .tab-btn.active { background: #fcf8f2; color: #d35400; border-bottom-color: #d35400; }
+
+        body.theme-sepia #settings-menu { background: #fcf8f2; border-color: #e0d5ba; }
+        body.theme-sepia .nav-btn { background: rgba(91, 70, 54, 0.05); border-color: rgba(91, 70, 54, 0.1); color: #5b4636; }
+        body.theme-sepia .nav-btn:hover { background: rgba(91, 70, 54, 0.15); }
+        
+        body.theme-sepia #progress-slider { background: #d1c1a3; }
+        body.theme-sepia .footer-btn { color: #7b6656; }
+        body.theme-sepia .footer-btn:hover { color: #5b4636; }
+
+        /* --- FORMAT WARNING MODAL --- */
+        #format-warning-modal {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.75); z-index: 10005; 
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        }
+        .warning-box {
+            background: #fff; padding: 30px; border-radius: 12px; max-width: 350px;
+            text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .warning-icon { font-size: 48px; margin-bottom: 10px; line-height: 1; }
+        .warning-box h3 { margin-top: 0; color: #333; font-weight: bold; margin-bottom: 15px; }
+        .warning-box p { margin-bottom: 25px; line-height: 1.5; color: #555; font-size: 15px; }
+        .warning-btn { padding: 12px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; transition: transform 0.1s; }
+        .warning-btn:active { transform: scale(0.95); }
+        #btn-warning-cancel { background: #e0e0e0; color: #333; }
+        #btn-warning-proceed { background: #d9534f; color: white; }
+
+        /* Dark Theme Overrides */
+        body.theme-dark .warning-box, body.theme-slate .warning-box { background: #222; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        body.theme-dark .warning-box h3, body.theme-slate .warning-box h3 { color: #eee; }
+        body.theme-dark .warning-box p, body.theme-slate .warning-box p { color: #aaa; }
+        body.theme-dark #btn-warning-cancel, body.theme-slate #btn-warning-cancel { background: #444; color: #ddd; }
+    </style>
+</head>
+<body class="theme-light">
+
+    <div id="cw-reader-data" 
+         data-settings="{{ bookmark.bookmark | forceescape if bookmark and bookmark.bookmark else '' }}" 
+         data-location="{{ saved_location | forceescape if saved_location else '' }}" 
+         style="display: none;"></div>
+
+    <div id="reader-loading">
+        <div class="spinner"></div>
+        <p style="margin-top: 15px; font-weight: bold;">Loading Book...</p>
+    </div>
+
+    <div id="reader-header">
+        <div>
+            <button id="btn-close" class="header-btn">Close</button>
+            <button id="btn-toc" class="header-btn" style="margin-left: 10px;">☰ Menu</button>
+        </div>
+        <div class="book-title">{{ title }}</div>
+        <div>
+            <button id="btn-bookmark" class="header-btn" title="Bookmark Page" style="margin-right: 5px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </button>
+            <button id="btn-settings" class="header-btn">Aa</button>
+        </div>
+    </div>
+
+    <div id="reader-footer">
+        <div id="annotation-loading-overlay">Retrieving Annotation & Bookmark Data. Please Wait...</div>
+        
+        <button id="btn-jump-start" class="footer-btn" title="Beginning of Book">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 6v12h2V6H7zm10 12l-8-6 8-6v12z"/></svg>
+        </button>
+        <button id="btn-prev-ann" class="footer-btn" title="Previous Note/Bookmark">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M15 18l-8-6 8-6v12z"/></svg>
+        </button>
+        
+        <div id="slider-wrapper">
+            <div id="tick-marks-container"></div>
+            <input type="range" id="progress-slider" min="0" max="100" step="0.1" value="0" disabled title="Generating Locations...">
+        </div>
+        
+        <button id="btn-next-ann" class="footer-btn" title="Next Note/Bookmark">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18l8-6-8-6v12z"/></svg>
+        </button>
+        <button id="btn-jump-end" class="footer-btn" title="End of Book">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 18l8-6-8-6v12zm8-12v12h2V6h-2z"/></svg>
+        </button>
+    </div>
+
+    <div id="toc-menu">
+        <div class="sidebar-tabs">
+            <button class="tab-btn active" data-target="tab-toc">Contents</button>
+            <button class="tab-btn" data-target="tab-bookmarks">Bookmarks</button>
+            <button class="tab-btn" data-target="tab-highlights">Notes</button>
+        </div>
+        <div id="tab-toc" class="tab-content active"><ul class="toc-list" id="toc-list-container"></ul></div>
+        <div id="tab-bookmarks" class="tab-content"><ul class="toc-list" id="bookmarks-list-container"></ul></div>
+        <div id="tab-highlights" class="tab-content"><ul class="toc-list" id="highlights-list-container"></ul></div>
+    </div>
+
+    <div id="settings-menu">
+        
+        <div class="mode-toggle">
+            <input type="radio" id="mode-read" name="exp-mode" value="read" checked>
+            <label for="mode-read">📖 Reading Mode</label>
+            <input type="radio" id="mode-study" name="exp-mode" value="study">
+            <label for="mode-study">🖍️ Study Mode</label>
+        </div>
+
+        <div class="menu-section-title">Typography</div>
+        <div class="setting-row">
+            <span class="setting-label">Font Style</span>
+            <select class="font-btn" id="font-select" style="width:140px;">
+                <option value="default">Publisher Default</option>
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="'Times New Roman', serif">Times New Roman</option>
+                <option value="Verdana, sans-serif">Verdana</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                <option value="'Courier New', monospace">Courier</option>
+                <option value="'Comic Sans MS', cursive, sans-serif">Comic Sans</option>
+            </select>
+        </div>
+        <div class="setting-row">
+            <span class="setting-label">Text Size</span>
+            <div><button class="font-btn" id="btn-font-dec">A-</button><button class="font-btn" id="btn-font-inc">A+</button></div>
+        </div>
+        <div class="setting-row">
+            <span class="setting-label">Line Spacing</span>
+            <div><button class="font-btn" id="btn-line-dec">-</button><button class="font-btn" id="btn-line-inc">+</button></div>
+        </div>
+        <div class="setting-row">
+            <span class="setting-label">Word Spacing</span>
+            <div><button class="font-btn" id="btn-word-dec">-</button><button class="font-btn" id="btn-word-inc">+</button></div>
+        </div>
+        <div class="setting-row">
+            <span class="setting-label">Paragraph Spacing</span>
+            <div><button class="font-btn" id="btn-para-dec">-</button><button class="font-btn" id="btn-para-inc">+</button></div>
+        </div>
+        
+        <div class="setting-row" id="row-bionic">
+            <span class="setting-label">Bold Sentence Starts</span>
+            <label style="cursor: pointer; margin: 0;">
+                <input type="checkbox" id="bionic-toggle" style="transform: scale(1.2); margin-right: 5px;"> Enable
+            </label>
+        </div>
+
+        <div style="border-top: 1px solid #eee; margin: 15px 0;"></div>
+        <div class="menu-section-title">Environment</div>
+
+        <div class="setting-row">
+            <span class="setting-label">Layout Mode</span>
+            <select class="font-btn" id="layout-select" style="width:140px;">
+                <option value="auto">Auto (Responsive)</option>
+                <option value="single">One Page</option>
+                <option value="spread">Two-Page Spread</option>
+            </select>
+        </div>
+        <div class="setting-row">
+            <span class="setting-label">Side Margins</span>
+            <div><button class="font-btn" id="btn-margin-dec">-</button><button class="font-btn" id="btn-margin-inc">+</button></div>
+        </div>
+        <div class="setting-row">
+            <span class="setting-label">Theme</span>
+            <select class="font-btn" id="theme-select" style="width:140px;">
+                <option value="auto">Auto (System)</option>
+                <option value="light">Light</option>
+                <option value="sepia">Sepia</option>
+                <option value="slate">Slate (Low Cont.)</option>
+                <option value="dark">Dark</option>
+            </select>
+        </div>
+        <div class="setting-row" id="row-nav">
+            <span class="setting-label">Navigation</span>
+            <select class="font-btn" id="nav-mode-select" style="width:140px;">
+                <option value="tap">Edge Tap Zones</option>
+                <option value="buttons">Floating Buttons</option>
+            </select>
+        </div>
+    </div>
+
+    <button id="btn-prev" class="nav-btn">❮</button>
+    <button id="btn-next" class="nav-btn">❯</button>
+
+    <div id="tap-zone-left" class="tap-zone"></div>
+    <div id="tap-zone-right" class="tap-zone"></div>
+
+    <div id="viewer"></div>
+
+    <div id="highlight-toolbar">
+        <span style="color: white; font-size: 14px; font-weight: bold;">Highlight:</span>
+        <button class="color-btn" data-color="yellow"></button>
+        <button class="color-btn" data-color="green"></button>
+        <button class="color-btn" data-color="red"></button>
+        <button class="color-btn" data-color="blue"></button>
+        <button id="btn-hl-cancel" style="background: transparent; border: 1px solid #777; color: #ccc; border-radius: 15px; padding: 4px 10px; cursor: pointer;">Cancel</button>
+    </div>
+
+    <div id="modal-backdrop" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);"></div>
+    <div id="annotation-modal">
+        <h4 style="margin-top: 0; margin-bottom: 15px;">Note</h4>
+        <div id="ann-text"></div>
+        <div id="ann-colors" style="margin-bottom: 15px; display: flex; gap: 10px; justify-content: center;">
+            <button class="color-btn modal-color-btn" data-color="yellow" style="position: static; transform: none;"></button>
+            <button class="color-btn modal-color-btn" data-color="green" style="position: static; transform: none;"></button>
+            <button class="color-btn modal-color-btn" data-color="red" style="position: static; transform: none;"></button>
+            <button class="color-btn modal-color-btn" data-color="blue" style="position: static; transform: none;"></button>
+        </div>
+        <textarea id="ann-note" placeholder="Add a personal note to this highlight..."></textarea>
+        <div style="display: flex; justify-content: space-between;">
+            <button id="btn-ann-delete" class="modal-btn">Delete</button>
+            <div>
+                <button id="btn-ann-cancel" class="modal-btn">Cancel</button>
+                <button id="btn-ann-save" class="modal-btn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+       $.ajaxSetup({
+            beforeSend: function(xhr, settings) {
+                if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                    xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token() }}");
+                }
+            }
+        });
+
+        $(document).ready(function() {
+            var localKey = "cw_settings_{{ bookid }}";
+            var $dataNode = $('#cw-reader-data');
+            var rawLocationData = $dataNode.attr('data-location');
+            var currentCfi = null;
+            var dbSettings = null;
+            var mismatchDetected = false;
+
+            try {
+                if (rawLocationData && rawLocationData !== "None" && rawLocationData !== "") {
+                    // Check if it's our new Universal Sync payload
+                    if (rawLocationData.startsWith('{')) {
+                        var parsed = JSON.parse(rawLocationData);
+                        currentCfi = parsed.cfi;
+                        dbSettings = parsed.settings;
+                    } else {
+                        currentCfi = rawLocationData;
+                    }
+                }
+            } catch(e) {}
+
+            // SANITY CHECK: Did they last read the PDF?
+            if (currentCfi && currentCfi.indexOf('page') !== -1 && currentCfi.indexOf('cfi') === -1) {
+                mismatchDetected = true;
+                currentCfi = null; // Clear poison data so it safely loads the cover in the background
+            }
+            
+            // New Auto Defaults
+            var readerSettings = { fontSize: 100, margin: 5, layout: 'auto', theme: 'auto', fontFamily: 'default', navMode: 'tap', lineHeight: 1.5, wordSpacing: 0, paragraphSpacing: 10, bionicMode: false, expMode: 'read' };
+            
+            try {
+                if (dbSettings) {
+                    Object.assign(readerSettings, dbSettings); // Prioritize Universally Synced Settings
+                } else {
+                    var rawDbSettings = $dataNode.data('settings');
+                    if (rawDbSettings) {
+                        var temp = typeof rawDbSettings === 'string' ? JSON.parse(rawDbSettings) : rawDbSettings;
+                        if (typeof temp === 'object' && temp !== null) { Object.assign(readerSettings, temp); }
+                    } else {
+                        var localStr = localStorage.getItem(localKey);
+                        if (localStr) { Object.assign(readerSettings, JSON.parse(localStr)); }
+                    }
+                }
+            } catch(e) {}
+
+            // Legacy Settings Upgrade Converter
+            if (readerSettings.columns !== undefined) {
+                if (readerSettings.columns === 'none') readerSettings.layout = 'single';
+                else if (readerSettings.columns === 'auto') readerSettings.layout = 'spread';
+                delete readerSettings.columns;
+            }
+
+            // --- THEME ENGINE ---
+            function getEffectiveTheme() {
+                var activeTheme = readerSettings.theme;
+                if (activeTheme === 'auto') {
+                    activeTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+                }
+                return activeTheme;
+            }
+
+            function applyTheme() {
+                var activeTheme = getEffectiveTheme();
+                $('body').removeClass('theme-light theme-dark theme-sepia theme-slate theme-auto').addClass('theme-' + activeTheme);
+            }
+            
+            applyTheme();
+            
+            // Listen for OS theme changes in real-time
+            if (window.matchMedia) {
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+                    if (readerSettings.theme === 'auto') {
+                        applyTheme();
+                        if (rendition) applyThemeToEngine();
+                    }
+                });
+            }
+
+            $('#theme-select').val(readerSettings.theme);
+            $('#layout-select').val(readerSettings.layout);
+
+            // --- DYNAMIC LAYOUT ENGINE ---
+            function getEffectiveLayout() {
+                if (readerSettings.layout === 'single') return 'none';
+                if (readerSettings.layout === 'spread') return 'auto';
+                
+                // Auto mode: Use 2 pages if it's landscape and wide enough
+                var isLandscape = window.innerWidth > window.innerHeight && window.innerWidth > 700;
+                return isLandscape ? 'auto' : 'none';
+            }
+
+            // APPLY NAVIGATION MODE
+            $('#nav-mode-select').val(readerSettings.navMode);
+            function applyNavMode() {
+                if (readerSettings.navMode === 'tap') {
+                    $('.nav-btn').hide();
+                    $('.tap-zone').show(); 
+                } else {
+                    $('.nav-btn').show();
+                    $('.tap-zone').hide();
+                }
+            }
+            applyNavMode();
+
+            $('#viewer').css({ 'left': readerSettings.margin + '%', 'right': readerSettings.margin + '%' });
+
+            var bookUrl = "{{ url_for('web.serve_book', book_id=bookid, book_format=book_format, anyname='file.epub') }}";
+            var book = ePub(bookUrl);
+            
+            var rendition = book.renderTo("viewer", {
+                width: "100%", height: "100%", spread: getEffectiveLayout(), allowScriptedContent: true 
+            });
+
+            var loadedAnnotations = {}; 
+            var pendingCfi = null;
+            var pendingText = "";
+            var currentAnnotationId = null;
+            var isDraggingSlider = false;
+
+            // --- THE DOUBLE LOCK FOR THE OVERLAY ---
+            var isLocationsGenerated = false;
+            var isAnnotationsLoaded = false;
+
+            function checkAndHideOverlay() {
+                if (isLocationsGenerated && isAnnotationsLoaded) {
+                    renderTickMarks();    // Safe to draw now!
+                    renderSidebarLists(); // Safe to list now!
+                    $('#annotation-loading-overlay').fadeOut('fast');
+                }
+            }
+            
+            var lastAnnotationCfi = null;
+            var isAutoNavigating = false;
+
+            book.ready.then(function() {
+                setTimeout(function() {
+                    book.locations.generate(1600).then(function() {
+                        $('#progress-slider').prop('disabled', false).attr('title', 'Drag to scroll');
+                        
+                        var activeCfi = currentCfi;
+                        if (!activeCfi || activeCfi === "None") {
+                            var loc = rendition.currentLocation();
+                            if (loc && loc.start) activeCfi = loc.start.cfi;
+                        }
+                        
+                        if (activeCfi && activeCfi !== "None") {
+                            var initialPct = book.locations.percentageFromCfi(activeCfi);
+                            if (initialPct >= 0) {
+                                $('#progress-slider').val(initialPct * 100);
+                            }
+                        }
+                        
+                        // Engine is done! Trigger the lock check.
+                        isLocationsGenerated = true;
+                        checkAndHideOverlay();
+                        
+                    }).catch(function(err) {});
+                }, 500); 
+            });
+
+            function getUnderlineStyles(color) {
+                var saturatedFills = { 'yellow': '#ffff00', 'green': '#00ff00', 'red': '#ff0000', 'blue': '#0000ff' };
+                var hex = saturatedFills[color] || saturatedFills['yellow'];
+                // Pass the color dynamically via the 'color' property (currentcolor)
+                return { "color": hex };
+            }
+            
+            function getSaturatedHexForColor(color) {
+                var saturatedFills = { 'yellow': '#ffff00', 'green': '#00ff00', 'red': '#ff0000', 'blue': '#0000ff' };
+                return saturatedFills[color] || saturatedFills['yellow'];
+            }
+
+            function loadAnnotations() {
+                $('#annotation-loading-overlay').css('display', 'flex'); // Show while loading
+                $.get("{{ url_for('web.get_annotations', book_id=bookid, format=book_format) }}", function(data) {
+                    Object.values(loadedAnnotations).forEach(function(ann) {
+                        if (ann.color !== 'bookmark') rendition.annotations.remove(ann.cfi, "underline");
+                    });
+                    
+                    loadedAnnotations = {};
+                    
+                    data.forEach(function(ann) {
+                        loadedAnnotations[ann.id] = ann;
+                        if (ann.color !== 'bookmark') {
+                            try {
+                                rendition.annotations.underline(ann.cfi, {}, (e) => {
+                                    openAnnotationModal(ann.id);
+                                }, "hl", getUnderlineStyles(ann.color));
+                            } catch(err) {
+                                console.warn("Could not draw highlight (DOM likely modified):", ann.cfi);
+                            }
+                        }
+                    });
+                    
+                    checkBookmarkState(currentCfi);
+                    
+                    // Database is done! Trigger the lock check.
+                    isAnnotationsLoaded = true;
+                    checkAndHideOverlay(); 
+                });
+            }
+
+            function renderTickMarks() {
+                if (!book.locations || book.locations.length() === 0) return;
+                var $container = $('#tick-marks-container');
+                $container.empty();
+                
+                Object.values(loadedAnnotations).forEach(function(ann) {
+                    var percentage = -1;
+                    try { percentage = book.locations.percentageFromCfi(ann.cfi); } catch(err) {}
+                    
+                    if (percentage >= 0) {
+                        var offsetCalc = 'calc(' + (percentage * 100) + '% + ' + (4 - (percentage * 8)) + 'px)';
+                        if (ann.color === 'bookmark') {
+                            var tick = $('<div class="tick-mark-bookmark"></div>').css({ left: offsetCalc }).attr('title', ann.text || 'Page Bookmark');
+                            $container.append(tick);
+                        } else {
+                            // Only draw colored highlight dots if Bold Words is OFF
+                            if (!readerSettings.bionicMode) {
+                                var tick = $('<div class="tick-mark"></div>').css({ left: offsetCalc, backgroundColor: getSaturatedHexForColor(ann.color), zIndex: 2 }).attr('title', ann.text || 'Annotation');
+                                $container.append(tick);
+                            }
+                        }
+                    }
+                });
+            }
+
+            function repaintAnnotations() {
+                Object.values(loadedAnnotations).forEach(function(ann) {
+                    if (ann.color !== 'bookmark') {
+                        try {
+                            rendition.annotations.remove(ann.cfi, "underline"); 
+                            rendition.annotations.underline(ann.cfi, {}, (e) => { 
+                                openAnnotationModal(ann.id);
+                            }, "hl", getUnderlineStyles(ann.color));
+                        } catch(err) {}
+                    }
+                });
+            }
+
+            function renderSidebarLists() {
+                var $bmList = $('#bookmarks-list-container');
+                var $hlList = $('#highlights-list-container');
+                $bmList.empty(); $hlList.empty();
+                
+                var sortedAnns = Object.values(loadedAnnotations).sort(function(a, b) {
+                    var pA = 0, pB = 0;
+                    try { pA = book.locations && book.locations.length() > 0 ? (book.locations.percentageFromCfi(a.cfi) || 0) : 0; } catch(err) {}
+                    try { pB = book.locations && book.locations.length() > 0 ? (book.locations.percentageFromCfi(b.cfi) || 0) : 0; } catch(err) {}
+                    return pA - pB;
+                });
+                
+                sortedAnns.forEach(function(ann) {
+                    var li = '<li><a href="#" class="sidebar-ann-link" data-cfi="' + ann.cfi + '" style="padding-right: 40px;">';
+                    if (ann.color === 'bookmark') {
+                        li += '<strong>' + (ann.text || 'Page Bookmark') + '</strong>';
+                        li += '</a><button class="btn-delete-ann" data-id="' + ann.id + '" data-cfi="' + ann.cfi + '" title="Delete">&times;</button></li>';
+                        $bmList.append(li);
+                    } else {
+                        var colorDot = '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:middle;background-color:'+ getSaturatedHexForColor(ann.color) +'"></span>';
+                        li += colorDot + '<span style="font-style:italic; color:#666;">"' + (ann.text ? ann.text.substring(0, 40) + '...' : '') + '"</span>';
+                        if (ann.note) li += '<br><span style="font-size:12px; margin-left:20px; display:block; margin-top:4px;">' + ann.note + '</span>';
+                        li += '</a><button class="btn-delete-ann" data-id="' + ann.id + '" data-cfi="' + ann.cfi + '" title="Delete">&times;</button></li>';
+                        $hlList.append(li);
+                    }
+                });
+                
+                $('.sidebar-ann-link').on('click', function(e) {
+                    e.preventDefault();
+                    var cfi = $(this).data('cfi');
+                    
+                    // ULTIMATE SAFARI FIX: Deep sanitize the CFI to structural parent element
+                    if (readerSettings.bionicMode && cfi) {
+                        var cleanCfi = cfi.split(',')[0];
+                        if (cleanCfi !== cfi) cleanCfi += ')';
+                        cleanCfi = cleanCfi.replace(/:\d+(?=\))/, ''); // Strip char offset
+                        cleanCfi = cleanCfi.replace(/\/\d*[13579](?=\))/, ''); // Strip text node
+                        cfi = cleanCfi;
+                    }
+                    
+                    isAutoNavigating = true; 
+                    lastAnnotationCfi = $(this).data('cfi'); // Keep original for math 
+                    $('#reader-loading').css('display', 'flex');
+                    try {
+                        rendition.display(cfi)
+                            .then(function() {
+                                $('#reader-loading').fadeOut('fast');
+                                if (window.innerWidth < 800) $('#toc-menu').removeClass('open'); 
+                            })
+                            .catch(function() { $('#reader-loading').fadeOut('fast'); });
+                    } catch(err) { $('#reader-loading').fadeOut('fast'); }
+                });
+                
+                $('.btn-delete-ann').on('click', function(e) {
+                    e.preventDefault(); e.stopPropagation();
+                    var id = $(this).data('id');
+                    var cfi = $(this).data('cfi');
+                    $.post("/ajax/delete_annotation/" + id, { csrf_token: "{{ csrf_token() }}" })
+                    .done(function() {
+                        if (loadedAnnotations[id] && loadedAnnotations[id].color !== 'bookmark') {
+                            rendition.annotations.remove(cfi, "underline");
+                        }
+                        delete loadedAnnotations[id];
+                        renderSidebarLists();
+                        renderTickMarks();
+                        checkBookmarkState(currentCfi);
+                    });
+                });
+                
+                if (typeof updateAnnButtons === 'function') updateAnnButtons();
+            }
+
+            function isSameStructuralLocation(cfi1, cfi2) {
+                if (!cfi1 || !cfi2) return false;
+                function clean(c) {
+                    var out = c.split(',')[0]; 
+                    if (out !== c) out += ')';
+                    out = out.replace(/:\d+(?=\))/, ''); // Strip char offset
+                    out = out.replace(/\/\d*[13579](?=\))/, ''); // Strip text node
+                    return out;
+                }
+                return clean(cfi1) === clean(cfi2);
+            }
+
+            function checkBookmarkState(cfi) {
+                var isBookmarked = false;
+                Object.values(loadedAnnotations).forEach(function(ann) {
+                    if (ann.color === 'bookmark' && isSameStructuralLocation(ann.cfi, cfi)) isBookmarked = true;
+                });
+                $('#btn-bookmark svg').attr('fill', isBookmarked ? 'currentColor' : 'none');
+            }
+
+            $('#btn-bookmark').on('click', function() {
+                var loc = rendition.currentLocation();
+                if (!loc) return;
+                var cfi = loc.start.cfi;
+                
+                // ULTIMATE SAFARI FIX: Deep sanitize the CFI before saving it so the database never holds a fragile coordinate
+                var cleanCfi = cfi.split(',')[0];
+                if (cleanCfi !== cfi) cleanCfi += ')';
+                cleanCfi = cleanCfi.replace(/:\d+(?=\))/, ''); 
+                cleanCfi = cleanCfi.replace(/\/\d*[13579](?=\))/, ''); 
+                cfi = cleanCfi;
+                
+                var existingId = null;
+                Object.values(loadedAnnotations).forEach(function(ann) {
+                    if (ann.color === 'bookmark' && isSameStructuralLocation(ann.cfi, cfi)) existingId = ann.id;
+                });
+                
+                if (existingId) {
+                    $.post("/ajax/delete_annotation/" + existingId, { csrf_token: "{{ csrf_token() }}" })
+                    .done(function() { loadAnnotations(); });
+                } else {
+                    var percentage = book.locations && book.locations.length() > 0 ? (book.locations.percentageFromCfi(cfi) || 0) : 0;
+                    var displayPct = Math.round(percentage * 100);
+                    var chapterName = "Bookmark"; 
+                    
+                    var spineItem = book.spine.get(cfi);
+                    if (book.navigation && spineItem) {
+                        var navItem = book.navigation.get(spineItem.href);
+                        if (navItem && navItem.label) chapterName = navItem.label.trim();
+                    }
+                    var textSnippet = chapterName + " (" + displayPct + "%)";
+                    
+                    $.post("{{ url_for('web.save_annotation', book_id=bookid) }}", {
+                        format: "{{ book_format }}", cfi: cfi, text: textSnippet,
+                        note: "Bookmark", color: "bookmark", csrf_token: "{{ csrf_token() }}"
+                    }).done(function() { loadAnnotations(); });
+                }
+            });
+
+            $('#progress-slider').on('mousedown touchstart', function() { isDraggingSlider = true; });
+            $('#progress-slider').on('mouseup touchend', function() { 
+                isDraggingSlider = false; 
+                var percentage = $(this).val() / 100;
+                
+                if (percentage >= 1) percentage = 0.999;
+                if (percentage <= 0) percentage = 0.001;
+                
+                if (book.locations && book.locations.length() > 0) {
+                    var cfi = book.locations.cfiFromPercentage(percentage);
+                    
+                    // ULTIMATE SAFARI FIX: Deep sanitize the CFI to structural parent element
+                    if (readerSettings.bionicMode && cfi) {
+                        var cleanCfi = cfi.split(',')[0];
+                        if (cleanCfi !== cfi) cleanCfi += ')';
+                        cleanCfi = cleanCfi.replace(/:\d+(?=\))/, ''); // Strip char offset
+                        cleanCfi = cleanCfi.replace(/\/\d*[13579](?=\))/, ''); // Strip text node
+                        cfi = cleanCfi;
+                    }
+                    
+                    $('#reader-loading').css('display', 'flex');
+                    try {
+                        rendition.display(cfi)
+                            .then(function() { $('#reader-loading').fadeOut('fast'); })
+                            .catch(function(e) { $('#reader-loading').fadeOut('fast'); });
+                    } catch(err) { $('#reader-loading').fadeOut('fast'); }
+                }
+            });
+
+            $('#btn-jump-start').on('click', function() {
+                if (book.locations && book.locations.length() > 0) {
+                    var cfi = book.locations.cfiFromPercentage(0.001);
+                    if (readerSettings.bionicMode && cfi) {
+                        var cleanCfi = cfi.split(',')[0];
+                        if (cleanCfi !== cfi) cleanCfi += ')';
+                        cleanCfi = cleanCfi.replace(/:\d+(?=\))/, ''); 
+                        cleanCfi = cleanCfi.replace(/\/\d*[13579](?=\))/, ''); 
+                        cfi = cleanCfi;
+                    }
+                    
+                    $('#reader-loading').css('display', 'flex');
+                    try {
+                        rendition.display(cfi)
+                            .then(function() { $('#reader-loading').fadeOut('fast'); })
+                            .catch(function(e) { $('#reader-loading').fadeOut('fast'); });
+                    } catch(err) { $('#reader-loading').fadeOut('fast'); }
+                }
+            });
+
+            $('#btn-jump-end').on('click', function() {
+                if (book.locations && book.locations.length() > 0) {
+                    var cfi = book.locations.cfiFromPercentage(0.999);
+                    if (readerSettings.bionicMode && cfi) {
+                        var cleanCfi = cfi.split(',')[0];
+                        if (cleanCfi !== cfi) cleanCfi += ')';
+                        cleanCfi = cleanCfi.replace(/:\d+(?=\))/, ''); 
+                        cleanCfi = cleanCfi.replace(/\/\d*[13579](?=\))/, ''); 
+                        cfi = cleanCfi;
+                    }
+                    
+                    $('#reader-loading').css('display', 'flex');
+                    try {
+                        rendition.display(cfi)
+                            .then(function() { $('#reader-loading').fadeOut('fast'); })
+                            .catch(function(e) { $('#reader-loading').fadeOut('fast'); });
+                    } catch(err) { $('#reader-loading').fadeOut('fast'); }
+                }
+            });
+
+            function jumpToAnnotation(direction) { 
+                if (!currentCfi || !book.locations || book.locations.length() === 0) return;
+                
+                var sortedAnns = Object.values(loadedAnnotations).sort(function(a, b) {
+                    var locA = book.locations.locationFromCfi(a.cfi) || 0;
+                    var locB = book.locations.locationFromCfi(b.cfi) || 0;
+                    if (locA === locB) return a.cfi.localeCompare(b.cfi);
+                    return locA - locB;
+                });
+                
+                if (sortedAnns.length === 0) return;
+
+                var baseCfi = lastAnnotationCfi || currentCfi;
+                var basePercentage = book.locations.percentageFromCfi(baseCfi) || 0;
+                var targetCfi = null;
+                var EPSILON = 0.002; 
+                
+                if (direction === 1) { 
+                    for (var i = 0; i < sortedAnns.length; i++) {
+                        var annP = book.locations.percentageFromCfi(sortedAnns[i].cfi) || 0;
+                        if (annP > basePercentage + EPSILON || (Math.abs(annP - basePercentage) <= EPSILON && sortedAnns[i].cfi > baseCfi)) {
+                            targetCfi = sortedAnns[i].cfi; break;
+                        }
+                    }
+                    // Wrap-around disabled intentionally
+                } else { 
+                    for (var i = sortedAnns.length - 1; i >= 0; i--) {
+                        var annP = book.locations.percentageFromCfi(sortedAnns[i].cfi) || 0;
+                        if (annP < basePercentage - EPSILON || (Math.abs(annP - basePercentage) <= EPSILON && sortedAnns[i].cfi < baseCfi)) {
+                            targetCfi = sortedAnns[i].cfi; break;
+                        }
+                    }
+                    // Wrap-around disabled intentionally
+                }
+                
+                if (targetCfi) {
+                    var navCfi = targetCfi;
+                    
+                    // ULTIMATE SAFARI FIX: Deep sanitize the CFI to structural parent element
+                    if (readerSettings.bionicMode && navCfi) {
+                        var cleanCfi = navCfi.split(',')[0];
+                        if (cleanCfi !== navCfi) cleanCfi += ')';
+                        cleanCfi = cleanCfi.replace(/:\d+(?=\))/, ''); // Strip char offset
+                        cleanCfi = cleanCfi.replace(/\/\d*[13579](?=\))/, ''); // Strip text node
+                        navCfi = cleanCfi;
+                    }
+                    
+                    isAutoNavigating = true; 
+                    lastAnnotationCfi = targetCfi; // Keep the original for tracking progress
+                    
+                    $('#reader-loading').css('display', 'flex');
+                    try {
+                        rendition.display(navCfi)
+                            .then(function() { $('#reader-loading').fadeOut('fast'); })
+                            .catch(function() { $('#reader-loading').fadeOut('fast'); });
+                    } catch(err) { $('#reader-loading').fadeOut('fast'); }
+                }
+            }
+
+            function updateAnnButtons() {
+                var $prevBtn = $('#btn-prev-ann');
+                var $nextBtn = $('#btn-next-ann');
+                
+                if (!currentCfi || !book.locations || book.locations.length() === 0 || Object.keys(loadedAnnotations).length === 0) {
+                    $prevBtn.prop('disabled', true);
+                    $nextBtn.prop('disabled', true);
+                    return;
+                }
+
+                var sortedAnns = Object.values(loadedAnnotations).sort(function(a, b) {
+                    var locA = book.locations.locationFromCfi(a.cfi) || 0;
+                    var locB = book.locations.locationFromCfi(b.cfi) || 0;
+                    if (locA === locB) return a.cfi.localeCompare(b.cfi);
+                    return locA - locB;
+                });
+
+                var baseCfi = lastAnnotationCfi || currentCfi;
+                var basePercentage = book.locations.percentageFromCfi(baseCfi) || 0;
+                var EPSILON = 0.002;
+                
+                var hasPrev = false;
+                var hasNext = false;
+
+                for (var i = 0; i < sortedAnns.length; i++) {
+                    var annP = book.locations.percentageFromCfi(sortedAnns[i].cfi) || 0;
+                    if (annP < basePercentage - EPSILON || (Math.abs(annP - basePercentage) <= EPSILON && sortedAnns[i].cfi < baseCfi)) hasPrev = true;
+                    if (annP > basePercentage + EPSILON || (Math.abs(annP - basePercentage) <= EPSILON && sortedAnns[i].cfi > baseCfi)) hasNext = true;
+                }
+
+                $prevBtn.prop('disabled', !hasPrev);
+                $nextBtn.prop('disabled', !hasNext);
+            }
+
+            $('#btn-prev-ann').on('click', function() { jumpToAnnotation(-1); });
+            $('#btn-next-ann').on('click', function() { jumpToAnnotation(1); });
+
+            $('.tab-btn').on('click', function() {
+                $('.tab-btn').removeClass('active');
+                $(this).addClass('active');
+                $('.tab-content').removeClass('active').hide();
+                $('#' + $(this).data('target')).addClass('active').show();
+            });
+
+            rendition.themes.register("light", { 
+                "body": { "background": "transparent", "color": "#333333" }, 
+                "p, div, h1, h2, h3, h4, h5, h6, li": { "color": "#333333 !important" }, 
+                "a[href]": { "color": "#007bff !important" } 
+            });
+            rendition.themes.register("sepia", { 
+                "body": { "background": "transparent", "color": "#5b4636" }, 
+                "p, div, h1, h2, h3, h4, h5, h6, li": { "color": "#5b4636 !important" }, 
+                "a[href]": { "color": "#d35400 !important" } 
+            });
+            rendition.themes.register("dark", { 
+                "body": { "background": "transparent", "color": "#dddddd" }, 
+                "p, div, h1, h2, h3, h4, h5, h6, li": { "color": "#dddddd !important" }, 
+                "a[href]": { "color": "#45b29d !important" } 
+            });
+            rendition.themes.register("slate", { 
+                "body": { "background": "transparent", "color": "#cdd6f4" }, 
+                "p, div, h1, h2, h3, h4, h5, h6, li": { "color": "#cdd6f4 !important" }, 
+                "a[href]": { "color": "#89b4fa !important" } 
+            });
+
+            function applyThemeToEngine(specificContent) {
+                var activeTheme = getEffectiveTheme();
+                
+                // Ensure epub.js native themes are also activated
+                rendition.themes.select(activeTheme);
+                
+                rendition.themes.fontSize(readerSettings.fontSize + "%");
+                if (readerSettings.fontFamily !== 'default') rendition.themes.font(readerSettings.fontFamily);
+                else rendition.themes.font('');
+                $('body').removeClass('theme-light theme-dark theme-sepia theme-slate theme-auto').addClass('theme-' + activeTheme);
+                
+                var themeColors = {
+                    'light': { text: '#333333', link: '#007bff' },
+                    'sepia': { text: '#5b4636', link: '#d35400' },
+                    'dark':  { text: '#dddddd', link: '#45b29d' },
+                    'slate': { text: '#cdd6f4', link: '#89b4fa' }
+                };
+                var colors = themeColors[activeTheme] || themeColors['light'];
+
+                var forcedCss = `
+                    :root { color-scheme: light dark; }
+                    html, body, div, section, article, main, header, footer { background: transparent !important; background-color: transparent !important; }
+                    body, p, div, span, h1, h2, h3, h4, h5, h6, li, blockquote, table, td, th { 
+                        color: ${colors.text} !important; 
+                        line-height: ${readerSettings.lineHeight} !important;
+                        word-spacing: ${readerSettings.wordSpacing}px !important;
+                    }
+                    p { margin-bottom: ${readerSettings.paragraphSpacing}px !important; }
+                    a, a[href] { color: ${colors.link} !important; }
+                `;
+
+                function injectCss(doc) {
+                    if (!doc) return;
+                    var styleEl = doc.getElementById('cw-dynamic-theme');
+                    if (!styleEl) {
+                        styleEl = doc.createElement('style');
+                        styleEl.id = 'cw-dynamic-theme';
+                        doc.head.appendChild(styleEl);
+                    }
+                    styleEl.innerHTML = forcedCss;
+                }
+
+                // Bypass the epub.js race condition by directly injecting into the new chapter!
+                if (specificContent && specificContent.document) {
+                    injectCss(specificContent.document);
+                } else {
+                    rendition.getContents().forEach(function(content) {
+                        injectCss(content.document);
+                    });
+                }
+            }
+
+            rendition.hooks.content.register(function(contents) {
+                applyThemeToEngine(contents);
+                
+                // --- SENTENCE STARTERS ENGINE ---
+                if (readerSettings.bionicMode) {
+                    var doc = contents.document;
+                    if (!doc.body.hasAttribute('data-sentence-starters-applied')) {
+                        
+                        // Walk through both Elements (to reset sentences on new paragraphs) and Text
+                        var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+                            acceptNode: function(node) {
+                                if (node.nodeType === 1) { // Element
+                                    var blockTags = ['P', 'DIV', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'TD', 'TH'];
+                                    if (blockTags.indexOf(node.nodeName) !== -1) return NodeFilter.FILTER_ACCEPT;
+                                    return NodeFilter.FILTER_SKIP;
+                                } else { // Text
+                                    var pName = node.parentNode.nodeName;
+                                    if (pName === 'SCRIPT' || pName === 'STYLE' || pName === 'B' || 
+                                        pName === 'STRONG' || pName === 'A' || pName === 'PRE' || pName === 'CODE') {
+                                        return NodeFilter.FILTER_REJECT;
+                                    }
+                                    if (node.nodeValue.trim() === '') return NodeFilter.FILTER_SKIP;
+                                    return NodeFilter.FILTER_ACCEPT;
+                                }
+                            }
+                        }, false);
+
+                        var nodesToProcess = [];
+                        while (walker.nextNode()) nodesToProcess.push(walker.currentNode);
+
+                        var isStartOfSentence = true;
+
+                        nodesToProcess.forEach(function(node) {
+                            if (node.nodeType === 1) {
+                                // We hit a block element (like a new paragraph), so reset the sentence tracker!
+                                isStartOfSentence = true;
+                            } else {
+                                var text = node.nodeValue;
+                                var newHtml = '';
+                                var changed = false;
+
+                                // Split text precisely into chunks of words and punctuation/spaces
+                                var tokens = text.split(/([a-zA-Z0-9\u00C0-\u024F]+)/);
+
+                                tokens.forEach(function(token) {
+                                    if (!token) return;
+                                    var isWord = /[a-zA-Z0-9\u00C0-\u024F]/.test(token);
+
+                                    if (isWord) {
+                                        if (isStartOfSentence) {
+                                            newHtml += '<span style="font-weight: 700;">' + token + '</span>';
+                                            isStartOfSentence = false;
+                                            changed = true;
+                                        } else {
+                                            newHtml += token;
+                                        }
+                                    } else {
+                                        newHtml += token;
+                                        // If the punctuation contains a period, exclamation, or question mark, 
+                                        // the NEXT word we see will be the start of a new sentence.
+                                        if (/[.!?]/.test(token)) {
+                                            isStartOfSentence = true;
+                                        }
+                                    }
+                                });
+
+                                if (changed) {
+                                    var span = doc.createElement('span');
+                                    span.innerHTML = newHtml;
+                                    node.parentNode.replaceChild(span, node);
+                                }
+                            }
+                        });
+                        doc.body.setAttribute('data-sentence-starters-applied', 'true');
+                    }
+                }
+                // -----------------------------
+
+                var safeWidth = rendition._layout.columnWidth ? rendition._layout.columnWidth + "px" : "100%";
+
+                var styleNode = contents.document.createElement("style");
+                styleNode.innerHTML = `
+                    * { box-sizing: border-box !important; opacity: 1 !important; visibility: visible !important; }
+                    a:not([href]) { color: inherit !important; text-decoration: none !important; pointer-events: none !important; }
+                    body, html, p, div, span, li, h1, h2, h3, h4, h5, h6 { max-width: 100% !important; page-break-inside: auto !important; break-inside: auto !important; -webkit-column-break-inside: auto !important; }
+                    code, samp, .listingcharacter { display: inline !important; white-space: pre-wrap !important; word-wrap: break-word !important; word-break: break-word !important; max-width: 100% !important; background: transparent !important; }
+                    pre, .listing, .listing pre { display: block !important; white-space: pre-wrap !important; word-wrap: break-word !important; word-break: break-all !important; overflow-wrap: anywhere !important; max-width: ${safeWidth} !important; overflow-x: hidden !important; page-break-inside: auto !important; break-inside: auto !important; -webkit-column-break-inside: auto !important; }
+                    img, svg, table { max-width: 100% !important; height: auto !important; }
+                `;
+                contents.document.head.appendChild(styleNode);
+
+                contents.window.addEventListener('click', function(e) {
+                    var el = e.target;
+                    while (el && el.tagName !== 'A' && el.tagName !== 'a') el = el.parentNode;
+                    
+                    if (el && el.getAttribute && el.getAttribute('href')) {
+                        var href = el.getAttribute('href');
+                        e.preventDefault(); e.stopPropagation(); 
+                        
+                        if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:')) {
+                            window.open(href, '_blank'); return;
+                        }
+
+                        var target = href;
+                        var loc = rendition.currentLocation();
+                        var currentHref = (loc && loc.start) ? book.spine.get(loc.start.index).href : "";
+                        
+                        if (href.startsWith('#')) {
+                            if (currentHref) target = currentHref + href;
+                        } else {
+                            if (currentHref) {
+                                var baseParts = currentHref.split('/');
+                                baseParts.pop(); 
+                                var hrefParts = href.split('/');
+                                var resultParts = baseParts.slice();
+                                for (var i = 0; i < hrefParts.length; i++) {
+                                    var part = hrefParts[i];
+                                    if (part === '..') resultParts.pop();
+                                    else if (part !== '.' && part !== '') resultParts.push(part);
+                                }
+                                target = resultParts.join('/');
+                            }
+                        }
+
+                        $('#reader-loading').css('display', 'flex');
+                        rendition.display(target).then(function() {
+                            $('#reader-loading').fadeOut('fast');
+                        }).catch(function(err) {
+                            if (target !== href) {
+                                rendition.display(href).then(function() { $('#reader-loading').fadeOut('fast'); })
+                                .catch(function() { $('#reader-loading').fadeOut('fast'); });
+                            } else { $('#reader-loading').fadeOut('fast'); }
+                        });
+                    }
+                }, true); 
+            });
+
+            rendition.on("selected", function(cfiRange, contents) {
+                book.getRange(cfiRange).then(function(range) {
+                    pendingText = range.toString().trim();
+                    if (pendingText.length > 0) {
+                        pendingCfi = cfiRange;
+                        $('#highlight-toolbar').css('display', 'flex'); 
+                    }
+                });
+            });
+
+            $('#highlight-toolbar .color-btn').on('click', function() {
+                var color = $(this).data('color');
+                if (pendingCfi) {
+                    // Sanitize line breaks and truncate text so the backend DB safely stores it!
+                    var cleanText = (pendingText || "").replace(/[\r\n]+/g, ' ').trim();
+                    var textSnippet = cleanText.length > 150 ? cleanText.substring(0, 150) + "..." : cleanText;
+                    
+                    rendition.annotations.underline(pendingCfi, {}, (e) => { }, "hl", getUnderlineStyles(color));
+                    
+                    $.post("{{ url_for('web.save_annotation', book_id=bookid) }}", {
+                        format: "{{ book_format }}", cfi: pendingCfi, text: textSnippet,
+                        note: "", color: color, csrf_token: "{{ csrf_token() }}"
+                    }).done(function() { loadAnnotations(); }); 
+                    
+                    $('#highlight-toolbar').hide();
+                    rendition.getContents().forEach(c => c.window.getSelection().removeAllRanges());
+                    pendingCfi = null;
+                }
+            });
+
+            $('#btn-hl-cancel').on('click', function() {
+                $('#highlight-toolbar').hide();
+                rendition.getContents().forEach(c => c.window.getSelection().removeAllRanges());
+                pendingCfi = null;
+            });
+
+            var modalSelectedColor = 'yellow';
+
+            function openAnnotationModal(id) {
+                var ann = loadedAnnotations[id];
+                if (ann) {
+                    currentAnnotationId = ann.id;
+                    pendingCfi = ann.cfi;
+                    
+                    if (ann.text && ann.text.trim() !== "") {
+                        $('#ann-text').text('"' + ann.text + '"');
+                    } else {
+                        $('#ann-text').text('(No text captured)');
+                    }
+                    
+                    $('#ann-note').val(ann.note || "");
+                    
+                    if (ann.color === 'bookmark') {
+                        $('#ann-colors').hide();
+                    } else {
+                        $('#ann-colors').show();
+                        modalSelectedColor = ann.color || 'yellow';
+                        $('.modal-color-btn').removeClass('selected');
+                        $('.modal-color-btn[data-color="' + modalSelectedColor + '"]').addClass('selected');
+                    }
+                    
+                    $('#modal-backdrop').fadeIn('fast');
+                    $('#annotation-modal').fadeIn('fast');
+                    $('#highlight-toolbar').hide(); 
+                }
+            }
+
+            $('.modal-color-btn').on('click', function() {
+                modalSelectedColor = $(this).data('color');
+                $('.modal-color-btn').removeClass('selected');
+                $(this).addClass('selected');
+            });
+
+            function closeAnnotationModal() {
+                $('#annotation-modal').fadeOut('fast');
+                $('#modal-backdrop').fadeOut('fast');
+            }
+
+            $('#btn-ann-cancel').on('click', function() { closeAnnotationModal(); });
+            $('#modal-backdrop').on('click', function() { closeAnnotationModal(); });
+
+            $('#btn-ann-delete').on('click', function() {
+                if (currentAnnotationId) {
+                    $.post("/ajax/delete_annotation/" + currentAnnotationId, { csrf_token: "{{ csrf_token() }}" })
+                    .done(function() {
+                        rendition.annotations.remove(pendingCfi, "underline");
+                        delete loadedAnnotations[currentAnnotationId];
+                        renderSidebarLists();
+                        renderTickMarks();
+                        closeAnnotationModal();
+                    });
+                }
+            });
+
+            $('#btn-ann-save').on('click', function() {
+                var note = $('#ann-note').val();
+                var ann = loadedAnnotations[currentAnnotationId];
+                if (ann) {
+                    var finalColor = (ann.color === 'bookmark') ? 'bookmark' : modalSelectedColor;
+                    $.post("{{ url_for('web.save_annotation', book_id=bookid) }}", {
+                        format: "{{ book_format }}", cfi: ann.cfi, text: ann.text || "",
+                        note: note, color: finalColor, csrf_token: "{{ csrf_token() }}"
+                    }).done(function() {
+                        ann.note = note;
+                        
+                        if (ann.color !== 'bookmark' && ann.color !== finalColor) {
+                            try {
+                                rendition.annotations.remove(ann.cfi, "underline");
+                                rendition.annotations.underline(ann.cfi, {}, (e) => { 
+                                    openAnnotationModal(ann.id);
+                                }, "hl", getUnderlineStyles(finalColor));
+                            } catch(err) {}
+                        }
+                        
+                        ann.color = finalColor; // Update memory
+                        renderSidebarLists();
+                        renderTickMarks(); // Update slider colors
+                        closeAnnotationModal();
+                    });
+                }
+            });
+
+            // PRE-LOAD THEME: Tell epub.js to select the active theme BEFORE it draws the iframe.
+            // This prevents Safari from caching the default white background on initial load!
+            applyThemeToEngine();
+
+            // PRE-LOAD THEME: Tell epub.js to select the active theme BEFORE it draws the iframe.
+            applyThemeToEngine();
+
+            var displayPromise;
+            if (currentCfi && currentCfi.trim() !== "" && currentCfi !== "None") {
+                currentCfi = currentCfi.replace(/:\d+(?=\))/, ''); // Sanitize poisoned data on arrival
+                displayPromise = rendition.display(currentCfi);
+            } else {
+                displayPromise = rendition.display();
+            }
+
+            displayPromise.then(function() { 
+                $('#reader-loading').fadeOut('fast'); 
+                loadAnnotations(); 
+            }).catch(function(err) {
+                console.warn("Failed to load saved location. Falling back...", err);
+                rendition.display().then(function() { 
+                    $('#reader-loading').fadeOut('fast'); 
+                    loadAnnotations(); 
+                }).catch(function() { 
+                    $('#reader-loading').fadeOut('fast'); 
+                });
+            });
+
+            $('#font-select').val(readerSettings.fontFamily);
+
+            $('#btn-close').on('click', function(e) {
+                e.preventDefault();
+                if (window.history.length > 1) window.history.back(); 
+                else window.location.href = "{{ url_for('web.index') }}";
+            });
+
+            var saveTimeout;
+            function syncProgress() {
+                if (mismatchDetected) return; //
+                clearTimeout(saveTimeout);
+                saveTimeout = setTimeout(function() {
+                    var settingsStr = JSON.stringify(readerSettings);
+                    localStorage.setItem(localKey, settingsStr);
+                    
+                    var safeProgress = 0.0;
+                    if (rendition.location && rendition.location.start && typeof rendition.location.start.percentage === 'number') {
+                        safeProgress = rendition.location.start.percentage;
+                    }
+
+                    // UNIVERSAL SYNC: Bundle settings directly into the location payload so they travel across devices!
+                    var syncPayload = JSON.stringify({ cfi: currentCfi || "", settings: readerSettings });
+
+                    $.ajax({
+                        type: "POST",
+                        url: "{{ url_for('web.save_progress', book_id=bookid) }}",
+                        data: {
+                            location: syncPayload, progress: safeProgress.toString(),
+                            format: "{{ book_format }}", csrf_token: "{{ csrf_token() }}"
+                        }
+                    });
+                }, 800); 
+            }
+
+            rendition.on("relocated", function(location) {
+                currentCfi = location.start.cfi;
+                
+                // SAFARI FIX: Strip text offset so we only save the stable paragraph coordinate
+                if (currentCfi) currentCfi = currentCfi.replace(/:\d+(?=\))/, '');
+                
+                syncProgress();
+                checkBookmarkState(currentCfi); 
+                
+                var currentPct = -1;
+                if (!isDraggingSlider && book.locations && book.locations.length() > 0) {
+                    // Use the exact annotation CFI for the slider if we just jumped to it
+                    var displayCfi = (isAutoNavigating && lastAnnotationCfi) ? lastAnnotationCfi : currentCfi;
+                    currentPct = book.locations.percentageFromCfi(displayCfi);
+                    if (currentPct >= 0) $('#progress-slider').val(currentPct * 100);
+                }
+
+                // Disable Jump & Page-Turn buttons at the absolute edges of the book
+                var isAtStart = location.atStart || (currentPct >= 0 && currentPct <= 0.005);
+                var isAtEnd = location.atEnd || (currentPct >= 0.995);
+                
+                $('#btn-jump-start, #btn-prev').prop('disabled', isAtStart);
+                $('#btn-jump-end, #btn-next').prop('disabled', isAtEnd);
+
+                if (isAutoNavigating) {
+                    isAutoNavigating = false;
+                } else {
+                    lastAnnotationCfi = null; 
+                }
+                
+                if (typeof updateAnnButtons === 'function') updateAnnButtons();
+            });
+
+            var lastEffectiveLayout = getEffectiveLayout();
+            var resizeTimer;
+            
+            $(window).on('resize', function() {
+                var currentEffectiveLayout = getEffectiveLayout();
+                if (currentEffectiveLayout !== lastEffectiveLayout) {
+                    lastEffectiveLayout = currentEffectiveLayout;
+                    clearTimeout(resizeTimer);
+                    resizeTimer = setTimeout(function() {
+                        rendition.spread(currentEffectiveLayout);
+                        repaintAnnotations();
+                    }, 250);
+                }
+            });
+
+            // --- REFLOW TRIPPERS (Precision Highlighting Fixes) ---
+
+            $('#layout-select').on('change', function() { 
+                readerSettings.layout = $(this).val(); 
+                var newLayout = getEffectiveLayout();
+                rendition.spread(newLayout);
+                lastEffectiveLayout = newLayout;
+                repaintAnnotations();
+                syncProgress(); 
+            });
+
+            $('#nav-mode-select').on('change', function() { 
+                readerSettings.navMode = $(this).val(); 
+                applyNavMode(); 
+                syncProgress(); 
+            });
+
+            $('#font-select').on('change', function() { 
+                readerSettings.fontFamily = $(this).val(); 
+                applyThemeToEngine(); 
+                repaintAnnotations(); // Force instant coordinate recalculation!
+                syncProgress(); 
+            });
+            
+            $('#theme-select').on('change', function() { 
+                readerSettings.theme = $(this).val(); 
+                applyTheme(); 
+                applyThemeToEngine(); 
+                
+                // FORCE REDRAW: Safari aggressively caches text colors from epub.js native themes.
+                // Redrawing the page destroys the old rules and applies the new theme perfectly.
+                var loc = rendition.currentLocation();
+                var cfiToDraw = currentCfi || (loc && loc.start ? loc.start.cfi : null);
+                
+                if (cfiToDraw) {
+                    $('#reader-loading').css('display', 'flex');
+                    try {
+                        rendition.display(cfiToDraw)
+                            .then(function() { 
+                                $('#reader-loading').fadeOut('fast'); 
+                                repaintAnnotations(); 
+                            })
+                            .catch(function() { $('#reader-loading').fadeOut('fast'); });
+                    } catch(err) { $('#reader-loading').fadeOut('fast'); }
+                } else {
+                    repaintAnnotations();
+                }
+                
+                renderSidebarLists(); 
+                syncProgress(); 
+            });
+
+            $('#btn-font-inc').on('click', function() { 
+                readerSettings.fontSize += 15; 
+                applyThemeToEngine(); 
+                repaintAnnotations(); // Force instant coordinate recalculation!
+                syncProgress(); 
+            });
+            
+            $('#btn-font-dec').on('click', function() { 
+                if (readerSettings.fontSize > 60) { 
+                    readerSettings.fontSize -= 15; 
+                    applyThemeToEngine(); 
+                    repaintAnnotations(); // Force instant coordinate recalculation!
+                    syncProgress(); 
+                } 
+            });
+
+            $('#btn-line-inc').on('click', function() { 
+                if (readerSettings.lineHeight < 3.0) { 
+                    readerSettings.lineHeight = Math.round((readerSettings.lineHeight + 0.1) * 10) / 10; 
+                    applyThemeToEngine(); 
+                    repaintAnnotations(); 
+                    syncProgress(); 
+                } 
+            });
+
+            $('#btn-line-dec').on('click', function() { 
+                if (readerSettings.lineHeight > 1.0) { 
+                    readerSettings.lineHeight = Math.round((readerSettings.lineHeight - 0.1) * 10) / 10; 
+                    applyThemeToEngine(); 
+                    repaintAnnotations(); 
+                    syncProgress(); 
+                } 
+            });
+
+            $('#btn-word-inc').on('click', function() { 
+                if (readerSettings.wordSpacing < 10) { 
+                    readerSettings.wordSpacing += 1; 
+                    applyThemeToEngine(); 
+                    repaintAnnotations(); 
+                    syncProgress(); 
+                } 
+            });
+
+            $('#btn-word-dec').on('click', function() { 
+                if (readerSettings.wordSpacing > 0) { 
+                    readerSettings.wordSpacing -= 1; 
+                    applyThemeToEngine(); 
+                    repaintAnnotations(); 
+                    syncProgress(); 
+                } 
+            });
+
+            $('#btn-para-inc').on('click', function() { 
+                if (readerSettings.paragraphSpacing < 50) { 
+                    readerSettings.paragraphSpacing += 5; 
+                    applyThemeToEngine(); 
+                    repaintAnnotations(); 
+                    syncProgress(); 
+                } 
+            });
+
+            $('#btn-para-dec').on('click', function() { 
+                if (readerSettings.paragraphSpacing > 0) { 
+                    readerSettings.paragraphSpacing -= 5; 
+                    applyThemeToEngine(); 
+                    repaintAnnotations(); 
+                    syncProgress(); 
+                } 
+            });
+            
+            $('#btn-margin-inc').on('click', function() { 
+                if (readerSettings.margin < 30) { 
+                    readerSettings.margin += 5; 
+                    $('#viewer').css({ 'left': readerSettings.margin + '%', 'right': readerSettings.margin + '%' }); 
+                    rendition.resize(); 
+                    repaintAnnotations(); // Force instant coordinate recalculation!
+                    syncProgress(); 
+                } 
+            });
+            
+            $('#btn-margin-dec').on('click', function() { 
+                if (readerSettings.margin > 0) { 
+                    readerSettings.margin -= 5; 
+                    $('#viewer').css({ 'left': readerSettings.margin + '%', 'right': readerSettings.margin + '%' }); 
+                    rendition.resize(); 
+                    repaintAnnotations(); // Force instant coordinate recalculation!
+                    syncProgress(); 
+                } 
+            });
+
+            // --- EXPERIENCE MODE LOGIC ---
+            
+            function enforceModeUI() {
+                if (readerSettings.expMode === 'study') {
+                    $('#row-bionic').addClass('disabled-row');
+                    $('#row-nav').addClass('disabled-row');
+                    $('#bionic-toggle').prop('checked', false);
+                    $('#nav-mode-select').val('buttons');
+                } else {
+                    $('#row-bionic').removeClass('disabled-row');
+                    $('#row-nav').removeClass('disabled-row');
+                    $('#bionic-toggle').prop('checked', readerSettings.bionicMode);
+                    $('#nav-mode-select').val(readerSettings.navMode);
+                }
+            }
+
+            // Set initial state on load
+            $('input[name="exp-mode"][value="' + readerSettings.expMode + '"]').prop('checked', true);
+            enforceModeUI();
+
+            // Listen for Mode Changes
+            $('input[name="exp-mode"]').on('change', function() {
+                var newMode = $(this).val();
+                readerSettings.expMode = newMode;
+                
+                var requiresReload = false;
+
+                if (newMode === 'study') {
+                    // Lock down the settings for highlighting
+                    if (readerSettings.bionicMode === true) {
+                        readerSettings.bionicMode = false;
+                        requiresReload = true; // We must purge the injected DOM spans
+                    }
+                    if (readerSettings.navMode !== 'buttons') {
+                        readerSettings.navMode = 'buttons';
+                        applyNavMode();
+                    }
+                }
+                
+                enforceModeUI();
+                
+                if (requiresReload) {
+                    $('#reader-loading').css('display', 'flex');
+                    $('#settings-menu').hide();
+                    
+                    // 1. Force save to LocalStorage immediately
+                    var settingsStr = JSON.stringify(readerSettings);
+                    localStorage.setItem("cw_settings_{{ bookid }}", settingsStr);
+                    
+                    // 2. Force an immediate AJAX save, bypassing the 800ms timer
+                    var safeProgress = 0.0;
+                    if (rendition && rendition.location && rendition.location.start && typeof rendition.location.start.percentage === 'number') {
+                        safeProgress = rendition.location.start.percentage;
+                    }
+                    
+                    // UNIVERSAL SYNC: Bundle settings directly into the location payload
+                    var syncPayload = JSON.stringify({ cfi: currentCfi || "", settings: readerSettings });
+                    
+                    $.ajax({
+                        type: "POST",
+                        url: "{{ url_for('web.save_progress', book_id=bookid) }}",
+                        data: {
+                            location: syncPayload, 
+                            progress: safeProgress.toString(),
+                            format: "{{ book_format }}", 
+                            csrf_token: "{{ csrf_token() }}"
+                        }
+                    }).done(function() {
+                        // 3. ONLY reload after the server confirms it has saved!
+                        window.location.reload();
+                    }).fail(function() {
+                        window.location.reload();
+                    });
+                } else {
+                    syncProgress(); // Standard delayed save if no reload is needed
+                }
+            });
+
+            // Set initial checkbox state
+            $('#bionic-toggle').prop('checked', readerSettings.bionicMode);
+
+            // Bionic Toggle Listener
+            $('#bionic-toggle').on('change', function() {
+                readerSettings.bionicMode = $(this).is(':checked');
+                
+                $('#reader-loading').css('display', 'flex'); // Show loading screen
+                $('#settings-menu').hide(); // Hide menu
+                
+                // 1. Force save to LocalStorage immediately
+                var settingsStr = JSON.stringify(readerSettings);
+                localStorage.setItem("cw_settings_{{ bookid }}", settingsStr);
+                
+                // 2. Force an immediate AJAX save, bypassing the 800ms timer
+                var safeProgress = 0.0;
+                if (rendition && rendition.location && rendition.location.start && typeof rendition.location.start.percentage === 'number') {
+                    safeProgress = rendition.location.start.percentage;
+                }
+                
+                var syncPayload = JSON.stringify({ cfi: currentCfi || "", settings: readerSettings });
+                
+                $.ajax({
+                    type: "POST",
+                    url: "{{ url_for('web.save_progress', book_id=bookid) }}",
+                    data: {
+                        location: syncPayload, 
+                        progress: safeProgress.toString(),
+                        format: "{{ book_format }}", 
+                        csrf_token: "{{ csrf_token() }}"
+                    }
+                }).done(function() {
+                    // 3. ONLY reload after the server confirms it has saved!
+                    window.location.reload();
+                }).fail(function() {
+                    window.location.reload();
+                });
+            });
+
+            var isNavigating = false;
+            
+            function safePrev() {
+                if (isNavigating) return;
+                isNavigating = true;
+                rendition.prev().then(function() { isNavigating = false; }).catch(function() { isNavigating = false; });
+                setTimeout(function() { isNavigating = false; }, 400); 
+            }
+            
+            function safeNext() {
+                if (isNavigating) return;
+                isNavigating = true;
+                rendition.next().then(function() { isNavigating = false; }).catch(function() { isNavigating = false; });
+                setTimeout(function() { isNavigating = false; }, 400); 
+            }
+
+            $('#btn-prev').on('click', safePrev);
+            $('#btn-next').on('click', safeNext);
+            
+            $('#tap-zone-left').on('click', function(e) { e.preventDefault(); e.stopPropagation(); safePrev(); });
+            $('#tap-zone-right').on('click', function(e) { e.preventDefault(); e.stopPropagation(); safeNext(); });
+            
+            document.addEventListener('keyup', function(e) { 
+                if (e.key === "ArrowLeft") safePrev(); 
+                if (e.key === "ArrowRight") safeNext(); 
+            });
+
+            function toggleUI() {
+                $('#reader-header').toggleClass('hidden');
+                $('#reader-footer').toggleClass('hidden'); 
+                $('#settings-menu').fadeOut('fast');
+                $('#toc-menu').removeClass('open');
+            }
+
+            function handleReaderClick(e) {
+                var el = e.target;
+                while (el && el.tagName) {
+                    if (el.tagName === 'A') return;
+                    el = el.parentNode;
+                }
+                toggleUI();
+            }
+
+            rendition.on("click", handleReaderClick);
+            
+            $('#viewer').on('click', function(e) {
+                if (e.target.id === 'viewer') {
+                    handleReaderClick(e);
+                }
+            });
+
+            $('#btn-settings').on('click', function() { $('#settings-menu').fadeToggle('fast'); $('#toc-menu').removeClass('open'); });
+            
+            $('#btn-toc').on('click', function() { 
+                $('#toc-menu').toggleClass('open'); 
+                $('#settings-menu').fadeOut('fast'); 
+            });
+
+            function buildToc(tocArray, level) {
+                var html = '';
+                var indent = level * 15; 
+                tocArray.forEach(function(chapter) {
+                    html += '<li><a href="#" class="toc-link" style="padding: 4px 20px 4px ' + (20 + indent) + 'px" data-href="' + chapter.href + '">' + chapter.label + '</a></li>';
+                    if (chapter.subitems && chapter.subitems.length > 0) html += buildToc(chapter.subitems, level + 1);
+                });
+                return html;
+            }
+
+            book.loaded.navigation.then(function(toc) {
+                var $list = $('#toc-list-container');
+                $list.html(buildToc(toc, 0));
+                
+                $('.toc-link').on('click', function(e) {
+                    e.preventDefault();
+                    $('#reader-loading').css('display', 'flex');
+                    rendition.display($(this).data('href')).then(function() {
+                        $('#reader-loading').fadeOut('fast');
+                        if (window.innerWidth < 800) $('#toc-menu').removeClass('open');
+                    }).catch(function() { $('#reader-loading').fadeOut('fast'); });
+                });
+            });
+
+            // --- CUSTOM WARNING MODAL LOGIC ---
+            if (mismatchDetected) {
+                $('#format-warning-text').text("You were previously reading the PDF version of this book. Bookmarks or annotations made to the PDF will not be visible here. Furthermore, your reading position will be reset to the start of the book. Are you sure you wish to continue?");
+                $('#format-warning-modal').css('display', 'flex');
+            }
+
+            $('#btn-warning-cancel').on('click', function() {
+                if (window.history.length > 1) window.history.back(); // Returns to previous page state (modal open)
+                else window.location.href = "{{ url_for('web.index') }}";
+            });
+
+            $('#btn-warning-proceed').on('click', function() {
+                mismatchDetected = false;
+                $('#format-warning-modal').fadeOut('fast');
+                syncProgress(); // Force save to overwrite the old PDF data
+            });
+        });
+    </script>
+
+    <div id="format-warning-modal" style="display: none;">
+        <div class="warning-box">
+            <div class="warning-icon">⚠️</div>
+            <h3>Different Book Format</h3>
+            <p id="format-warning-text"></p>
+            <div style="display: flex; justify-content: space-between; gap: 10px;">
+                <button id="btn-warning-cancel" class="warning-btn" style="flex: 1;">Cancel</button>
+                <button id="btn-warning-proceed" class="warning-btn" style="flex: 1;">Continue</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

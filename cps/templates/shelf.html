@@ -1,0 +1,856 @@
+{% import 'image.html' as image %}
+{% extends "layout.html" %}
+
+{% block body %}
+{% set wishlist_ns = namespace(id=None) %}
+{% if current_user.is_authenticated %}
+    {% for shelf in g.shelves_access %}
+        {% if "wishlist" in shelf.name|string|lower %}
+            {% set wishlist_ns.id = shelf.id %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
+{% set body_wishlist_id = wishlist_ns.id %}
+
+{# NEW: PER-SHELF STACKING PREFERENCE #}
+{% set stack_pref = current_user.get_view_property("shelf_stack", shelf.id|string) %}
+{% set is_stacked = (stack_pref is none or stack_pref|int == 1) %}
+
+<div id="shelf-meta" data-current-shelf-id="{{ shelf.id }}" data-csrf="{{ csrf_token() }}" style="display:none;"></div>
+
+<div class="sticky-header {% if pagination and (pagination.has_next or pagination.has_prev) %}has-pagination{% endif %}">
+    
+    <div class="header-top">
+      <div class="dropdown">
+        <div class="gear-btn dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <span class="glyphicon glyphicon-cog"></span>
+        </div>
+        <ul class="dropdown-menu">
+           <li class="dropdown-header">{{_('Sort By')}}</li>
+           
+           <li><a href="{{ url_for('shelf.show_shelf', shelf_id=shelf.id, sort_param='new') }}">
+               <span class="glyphicon glyphicon-ok" {% if order != 'new' and order != 'stored' %}style="visibility:hidden;"{% endif %}></span> {{_('Date Added (Newest)')}}
+           </a></li>
+           <li><a href="{{ url_for('shelf.show_shelf', shelf_id=shelf.id, sort_param='old') }}">
+               <span class="glyphicon glyphicon-ok" {% if order != 'old' %}style="visibility:hidden;"{% endif %}></span> {{_('Date Added (Oldest)')}}
+           </a></li>
+           <li class="divider"></li>
+           <li><a href="{{ url_for('shelf.show_shelf', shelf_id=shelf.id, sort_param='abc') }}">
+               <span class="glyphicon glyphicon-ok" {% if order != 'abc' %}style="visibility:hidden;"{% endif %}></span> {{_('Title (A-Z)')}}
+           </a></li>
+           <li><a href="{{ url_for('shelf.show_shelf', shelf_id=shelf.id, sort_param='zyx') }}">
+               <span class="glyphicon glyphicon-ok" {% if order != 'zyx' %}style="visibility:hidden;"{% endif %}></span> {{_('Title (Z-A)')}}
+           </a></li>
+           <li class="divider"></li>
+           <li><a href="{{ url_for('shelf.show_shelf', shelf_id=shelf.id, sort_param='authaz') }}">
+               <span class="glyphicon glyphicon-ok" {% if order != 'authaz' %}style="visibility:hidden;"{% endif %}></span> {{_('Author (A-Z)')}}
+           </a></li>
+           <li><a href="{{ url_for('shelf.show_shelf', shelf_id=shelf.id, sort_param='authza') }}">
+               <span class="glyphicon glyphicon-ok" {% if order != 'authza' %}style="visibility:hidden;"{% endif %}></span> {{_('Author (Z-A)')}}
+           </a></li>
+           <li class="divider"></li>
+           <li><a href="{{ url_for('shelf.show_shelf', shelf_id=shelf.id, sort_param='pubnew') }}">
+               <span class="glyphicon glyphicon-ok" {% if order != 'pubnew' %}style="visibility:hidden;"{% endif %}></span> {{_('Pub Date (Newest)')}}
+           </a></li>
+           <li><a href="{{ url_for('shelf.show_shelf', shelf_id=shelf.id, sort_param='pubold') }}">
+               <span class="glyphicon glyphicon-ok" {% if order != 'pubold' %}style="visibility:hidden;"{% endif %}></span> {{_('Pub Date (Oldest)')}}
+           </a></li>
+           
+           {% if entries.__len__() %}
+             <li class="divider"></li>
+             <li><a href="{{ url_for('shelf.order_shelf', shelf_id=shelf.id) }}"><span class="glyphicon glyphicon-list"></span> {{ _('Manual Order') }}</a></li>
+           {% endif %}
+           
+           {% if not (body_wishlist_id and shelf.id == body_wishlist_id) %}
+           <li class="divider"></li>
+           <li class="dropdown-header">{{_('View Modifiers')}}</li>
+           <li>
+               <a href="#" id="toggle-user-ratings">
+                   <span class="glyphicon glyphicon-{% if request.cookies.get('cw_show_user_ratings', '1') == '1' %}check{% else %}unchecked{% endif %}"></span> {{_('Show User Ratings')}}
+               </a>
+           </li>
+           <li>
+               <a href="#" id="toggle-series-first">
+                   <span class="glyphicon glyphicon-{% if request.cookies.get('cw_series_first') == '1' %}check{% else %}unchecked{% endif %}"></span> {{_('Series First')}}
+               </a>
+           </li>
+           <li>
+               <a href="#" id="toggle-stack-series" data-shelf-id="{{ shelf.id }}">
+                   <span class="glyphicon glyphicon-{% if is_stacked %}check{% else %}unchecked{% endif %}"></span> {{_('Stack Series')}}
+               </a>
+           </li>
+           {% endif %}
+
+           {% if current_user.is_authenticated %}
+                <li class="divider"></li>
+                <li>
+                    <a href="#" id="menu-bulk-edit">
+                        <span class="glyphicon glyphicon-check"></span> {{ _('Bulk Edit') }}
+                    </a>
+                </li>
+           {% endif %}
+
+           {% if current_user.is_authenticated %}
+            {% if (current_user.role_edit_shelfs() and shelf.is_public ) or not shelf.is_public  %}
+              <li class="divider"></li>
+              <li><a href="{{ url_for('shelf.edit_shelf', shelf_id=shelf.id) }}"><span class="glyphicon glyphicon-pencil"></span> {{ _('Edit Shelf') }}</a></li>
+              <li><a href="#" data-toggle="modal" data-target="#customDeleteModal"><span class="glyphicon glyphicon-trash"></span> {{ _('Delete Shelf') }}</a></li>
+            {% endif %}
+           {% endif %}
+           {% if current_user.role_download() %}
+             <li class="divider"></li>
+             <li><a href="{{ url_for('shelf.show_simpleshelf', shelf_id=shelf.id) }}"><span class="glyphicon glyphicon-download-alt"></span> {{ _('Download Shelf') }}</a></li>
+           {% endif %}
+        </ul>
+      </div>
+
+      <h2>
+        {{title.replace("'", "")}} 
+        <small>
+            {% if pagination %}
+                {% if entries|length > 0 %}
+                    {% set start_idx = (pagination.page - 1) * pagination.per_page + 1 %}
+                    {% set end_idx = start_idx + entries|length - 1 %}
+                    [{{_('Books')}} {{ start_idx }} {{_('-')}} {{ end_idx }} {{_('out of')}} {{ pagination.total_count }}]
+                {% else %}
+                    [0 {{_('Books')}}]
+                {% endif %}
+            {% elif entries %}
+                [{{entries|length}}]
+            {% else %}
+                [0 {{_('Books')}}]
+            {% endif %}
+        </small>
+      </h2>
+    </div>
+
+    <div class="header-bottom">
+      {% if pagination and (pagination.has_next or pagination.has_prev) %}
+            <div class="pagination" data-per-page="{{ pagination.per_page }}" data-total="{{ pagination.total_count }}">
+              {% if pagination.has_prev %}
+              <li class="page-item page-previous"><a class="page-link" aria-label="next page" href="{{ (pagination.page - 1)|url_for_other_page }}">&laquo;</a></li>
+              {% endif %}
+            {% for page in pagination.iter_pages() %}
+              {% if page %}
+                {% if page != pagination.page %}
+                  <li class="page-item"><a class="page-link" aria-label="to page {{ page }}" href="{{ (page)|url_for_other_page }}">{{ page }}</a></li>
+                {% else %}
+                  <li class="page-item active"><a class="page-link" aria-label="to page {{ page }}" href="{{ (page)|url_for_other_page }}">{{ page }}</a></li>
+                {% endif %}
+              {% else %}
+                <li class="page-item page-last-separator disabled"><a class="page-link" aria-label="">…</a></li>
+              {% endif %}
+            {% endfor %}
+            {% if pagination.has_next %}
+              <li class="page-item page-next"><a class="page-link next" aria-label="next page" href="{{ (pagination.page + 1)|url_for_other_page }}">&raquo;</a></li>
+            {% endif %}
+            </div>
+      {% endif %}
+    </div>
+</div>
+
+<div id="bulk-action-bar">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-3 col-xs-12 text-center" style="margin-bottom: 5px;">
+                <button class="btn btn-default btn-sm" id="bulk-select-all">{{ _('Select All') }}</button>
+                <button class="btn btn-default btn-sm" id="bulk-select-none">{{ _('None') }}</button>
+                <span style="margin-left:10px;">Selected: <b id="selection-count">0</b></span>
+            </div>
+            
+            <div class="col-md-6 col-xs-12 text-center" style="margin-bottom: 5px;">
+                <form class="form-inline" style="display: inline-block;">
+                    <div class="btn-group dropup">
+                        <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            <span id="bulk-target-label">-- {{ _('Select Target Shelf') }} --</span> <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu" id="bulk-target-list">
+                            {% if current_user.is_authenticated %}
+                                {% for s in g.shelves_access %}
+                                    {% if s.id != shelf.id and s.id != body_wishlist_id %}
+                                        <li><a href="#" data-value="{{ s.id }}">{{ s.name }}</a></li>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </ul>
+                    </div>
+                    <input type="hidden" id="bulk-target-shelf" value="">
+
+                    <button type="button" class="btn btn-info btn-sm" id="btn-copy" disabled>{{ _('Copy') }}</button>
+                    
+                    {% if shelf.id != body_wishlist_id %}
+                        <button type="button" class="btn btn-warning btn-sm" id="btn-move" disabled>{{ _('Move') }}</button>
+                    {% endif %}
+                    
+                    {% if body_wishlist_id and shelf.id != body_wishlist_id %}
+                        <button type="button" class="btn btn-success btn-sm" id="btn-bulk-wishlist" style="margin-left: 10px;">
+                            <span class="glyphicon glyphicon-heart"></span> {{ _('Wishlist') }}
+                        </button>
+                    {% endif %}
+                </form>
+            </div>
+
+            <div class="col-md-3 col-xs-12 text-center">
+                <button type="button" class="btn btn-danger btn-sm" id="btn-remove">{{ _('Remove') }}</button>
+                <button type="button" class="btn btn-default btn-sm" id="btn-cancel-bulk" style="margin-left: 10px;">{{ _('Cancel') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="customDeleteModal" tabindex="-1" role="dialog" aria-labelledby="customDeleteModalLabel">
+  <div class="modal-dialog modal-sm" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="customDeleteModalLabel">{{ _('Delete Shelf') }}</h4>
+      </div>
+      <div class="modal-body">
+        <p>{{ _('Are you sure you want to delete this shelf?') }}</p>
+        <p class="text-danger"><strong>{{ shelf.name }}</strong></p>
+      </div>
+      <div class="modal-footer">
+        <form action="{{ url_for('shelf.delete_shelf', shelf_id=shelf.id) }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="button" class="btn btn-default" data-dismiss="modal">{{ _('Cancel') }}</button>
+            <button type="submit" class="btn btn-danger">{{ _('Delete') }}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="bulk-process-overlay">
+    <div class="processing-box">
+        <h3>{{ _('Processing...') }}</h3>
+        <p>{{ _('Please wait while we update your shelves.') }}</p>
+        <div class="progress">
+          <div id="bulk-progress-bar" class="progress-bar progress-bar-striped active" role="progressbar" style="width: 0%"></div>
+        </div>
+        <p id="bulk-status-text">0 / 0</p>
+    </div>
+</div>
+
+<div class="browse-books">
+    <div class="row display-flex" style="margin-left: 0; margin-right: 0;">
+    {% for entry in entries %}
+    
+    {% set current_book_id = entry.Books.id if entry.Books else (entry[0].id if entry[0] else entry.id) %}
+    {% set current_book = entry.Books if entry.Books else (entry[0] if entry[0] else entry) %}
+    {% set disable_stack = (body_wishlist_id and shelf.id == body_wishlist_id) %}
+    
+    {% set is_read = false %}
+        {% if entry is defined and entry|length > 2 and entry[2] is defined and (entry[2] == True or entry[2] == 1) %}
+            {% set is_read = true %}
+        {% elif entry is defined and entry|length > 1 and entry[1] is defined and entry[1].read_status is defined and (entry[1].read_status == 1 or entry[1].read_status == True) %}
+            {% set is_read = true %}
+        {% elif current_book is defined and current_book.read_status is defined and (current_book.read_status == 1 or current_book.read_status == True) %}
+            {% set is_read = true %}
+        {% elif current_book is defined and current_book.is_read is defined and (current_book.is_read == 1 or current_book.is_read == True) %}
+            {% set is_read = true %}
+        {% elif book is defined and book.read_status is defined and (book.read_status == 1 or book.read_status == True) %}
+            {% set is_read = true %}
+        {% elif book is defined and book.is_read is defined and (book.is_read == 1 or book.is_read == True) %}
+            {% set is_read = true %}
+        {% elif book is defined and book.reading_progress_pct is defined and book.reading_progress_pct >= 100 %}
+            {% set is_read = true %}
+        {% endif %}
+    
+    {# NATIVE STACK LOGIC: Check if it should be stacked here on the server #}
+    {% set stack_count = series_counts.get(current_book.series[0].id, 1) if (series_counts and current_book.series) else 1 %}
+    {% set is_book_stacked = (is_stacked and not disable_stack and current_book.series and stack_count > 1) %}
+    
+    <div class="col-sm-3 col-lg-2 col-xs-6 book session {% if is_book_stacked %}is-stack{% endif %}" 
+         style="padding-left: 10px; padding-right: 10px;"
+         data-title="{{ current_book.title|default('')|lower }}"
+         data-date="{{ current_book.timestamp|default('1970-01-01') }}"
+         data-pubdate="{{ current_book.pub_date|default('1970-01-01') }}"
+         data-author="{{ current_book.authors[0].name|default('')|lower if current_book.authors else '' }}"
+         >
+      <div class="cover {% if is_read %}read-book-dimmed{% endif %}" data-book-id="{{ current_book_id }}">
+            
+            {# NATIVE ROUTING: If stacked, link straight to the Series page. No Modals! #}
+            {% if is_book_stacked %}
+                <a href="{{ url_for('web.books_list', data='series', sort_param='stored', book_id=current_book.series[0].id) }}">
+            {% else %}
+                <a href="{{ url_for('web.show_book', book_id=current_book_id) }}" {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}>
+            {% endif %}
+              
+              <span class="img" title="{{current_book.title}}" >
+                {{ image.book_cover(current_book) }}
+                
+                {# NATIVE BADGE: Draw the actual count on the server #}
+                {% if is_book_stacked %}
+                    <div class="stack-badge" style="position:absolute; top:-8px; right:-8px; background:#337ab7; color:#fff; font-size:12px; padding:3px 7px; border-radius:12px; font-weight:bold; z-index:20;"><span class="glyphicon glyphicon-book" style="margin-right:4px;"></span>{{ stack_count }}</div>
+                {% endif %}
+
+                {% if is_read %}
+                    <div class="read-overlay"><span class="glyphicon glyphicon-ok"></span> {{_('READ')}}</div>
+                {% endif %}
+                
+                {% if (body_wishlist_id and shelf.id == body_wishlist_id) or (current_book_id|int in global_wishlist_ids|default([])) %}
+                    <div class="wishlist-overlay"><span class="glyphicon glyphicon-heart"></span></div>
+                {% endif %}
+                
+                <div class="bulk-select-overlay">
+                    <span class="glyphicon glyphicon-ok-circle"></span>
+                </div>
+                
+                {% if request.cookies.get('cw_show_user_ratings', '1') == '1' %}
+                    {% set u_rating = global_user_ratings.get(current_book_id|int) %}
+                    {% if u_rating %}
+                        <div class="user-rating-pill">
+                            {% set stars = (u_rating / 2)|int %}
+                            {% for i in range(stars) %}&#9733;{% endfor %}{% for i in range(5 - stars) %}<span class="star-dot">&#9679;</span>{% endfor %}
+                        </div>
+                    {% endif %}
+                {% endif %}
+              </span>
+            </a>
+      </div>
+
+      {% set prog = global_reading_progress.get(current_book_id|int) %}
+      {% if prog is not none %}
+        <div style="height: 5px; background: #e0e0e0; border-radius: 3px; margin-top: 8px; margin-bottom: -3px; overflow: hidden; width: 100%;">
+            <div style="height: 100%; background: #007bff; width: {{ prog }}%; border-radius: 3px;"></div>
+        </div>
+      {% endif %}
+
+      <div class="meta">
+        {% if is_book_stacked %}
+            <a href="{{ url_for('web.books_list', data='series', sort_param='stored', book_id=current_book.series[0].id) }}">
+              <p title="{{current_book.series[0].name}}" class="title">{{current_book.series[0].name|shortentitle}} (Series)</p>
+            </a>
+        {% else %}
+            <a href="{{ url_for('web.show_book', book_id=current_book_id) }}" {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}>
+              <p title="{{current_book.title}}" class="title">{{current_book.title|shortentitle}}</p>
+            </a>
+            <p class="author">
+              {% for author in current_book.authors %}
+                {% if loop.index > g.config_authors_max and g.config_authors_max != 0 %}
+                  {% if not loop.first %}
+                    <span class="author-hidden-divider">&amp;</span>
+                  {% endif %}
+                  <a class="author-name author-hidden" href="{{url_for('web.books_list',  data='author', sort_param='stored', book_id=author.id) }}">{{author.name.replace('|',',')|shortentitle(30)}}</a>
+                  {% if loop.last %}
+                    <a href="#" class="author-expand" data-authors-max="{{g.config_authors_max}}" data-collapse-caption="({{_('reduce')}})">(...)</a>
+                  {% endif %}
+                {% else %}
+                  {% if not loop.first %}
+                    <span>&amp;</span>
+                  {% endif %}
+                  <a class="author-name" href="{{url_for('web.books_list',  data='author', sort_param='stored', book_id=author.id) }}">{{author.name.replace('|',',')|shortentitle(30)}}</a>
+                {% endif %}
+              {% endfor %}
+            </p>
+            {% if current_book.series.__len__() > 0 %}
+            <p class="series">
+              <a href="{{url_for('web.books_list', data='series', sort_param='stored', book_id=current_book.series[0].id )}}">
+                {{current_book.series[0].name}}
+              </a>
+              {% if current_book.series_index|float > 0 %}
+                  [{{current_book.series_index|formatfloat(2)}}]
+              {% endif %}
+            </p>
+            {% endif %}
+            {% if current_book.ratings.__len__() > 0 %}
+            <div class="rating">
+              {% for number in range((current_book.ratings[0].rating/2)|int(2)) %}
+                <span class="glyphicon glyphicon-star good"></span>
+                {% if loop.last and loop.index < 5 %}
+                  {% for numer in range(5 - loop.index) %}
+                    <span class="glyphicon glyphicon-star-empty"></span>
+                  {% endfor %}
+                {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<style>
+    /* --- UNIFORM COVER SIZING --- */
+    .book.session .cover {
+        margin-bottom: 12px !important; 
+        position: relative !important;
+    }
+    
+    .book.session .cover .img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 2 / 2.8; 
+        background-color: #f4f4f4; 
+        border-radius: 4px;
+        position: relative;
+        z-index: 1; 
+    }
+    
+    .book.session .cover .img img {
+        display: block; 
+        width: 100%;
+        height: 100%;
+        border-radius: inherit;
+        object-fit: fill; 
+    }
+
+    /* --- FLAT CSS STACK EFFECT --- */
+    .book.session.is-stack .img {
+        border: none; 
+        margin-bottom: 8px; 
+        margin-right: 8px;
+        box-shadow:
+            4px 4px 0 0px #cccccc,
+            8px 8px 0 0px #e6e6e6;
+    }
+
+    body { overflow-y: hidden !important; }
+    
+    /* ADDED MARGIN-BOTTOM FOR ROW SPACING */
+    .book.session { 
+        cursor: pointer; 
+        margin-bottom: 25px; 
+    }
+    
+    @media (min-width: 768px) {
+        .browse-books {
+            margin-top: 85px !important;
+            height: calc(100vh - 150px) !important;
+            overflow-y: auto; 
+        }
+    }
+
+    /* FIX FOR SAFARI MEMORY LEAK: Removed translateZ(0) */
+    .read-overlay {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.75);
+        color: #fff;
+        padding: 6px 10px;
+        border-radius: 4px;
+        border: 1px solid rgba(255,255,255,0.4);
+        font-weight: bold; font-size: 13px;
+        text-transform: uppercase;
+        pointer-events: none; z-index: 10;
+        white-space: nowrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .read-book-dimmed img { 
+        opacity: 0.6; 
+        filter: grayscale(100%); 
+        transition: filter 0.3s ease, opacity 0.3s ease; 
+    }
+    .read-book-dimmed:hover img { 
+        opacity: 1.0; 
+        filter: grayscale(0%); 
+    }
+
+    /* Wishlist Heart Badge */
+    .wishlist-overlay {
+        position: absolute;
+        top: 6px; left: 6px;
+        width: 30px; height: 30px;
+        background: #fff;
+        border-radius: 50%;
+        border: 1px solid #ccc;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 15;
+        pointer-events: none;
+    }
+    .wishlist-overlay .glyphicon {
+        color: #d9534f;
+        font-size: 17px;
+        top: 1px;
+    }
+    
+    .cover { position: relative !important; }
+
+    /* Layout Fix for Android */
+    @media (max-width: 991px) {
+        #sidebar { width: 25% !important; float: left !important; display: block !important; padding-right: 10px !important; }
+        #sidebar + div, #sidebar + .col-sm-9 { width: 75% !important; float: left !important; display: block !important; }
+    }
+
+    /* BULK EDIT STYLES */
+    #bulk-action-bar {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        background: #333; color: #fff;
+        padding: 10px;
+        z-index: 2000;
+        display: none;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+    }
+    
+    #bulk-action-bar .dropdown-menu {
+        top: auto;
+        bottom: 100%;
+        margin-bottom: 2px;
+    }
+
+    /* VISUAL CUE: Color change for header in Bulk Mode */
+    .bulk-mode .sticky-header {
+        background-color: #333 !important;
+        color: #fff !important;
+        border-bottom: 1px solid #555;
+    }
+    .bulk-mode .sticky-header h2, 
+    .bulk-mode .sticky-header small {
+        color: #fff !important;
+    }
+    .bulk-mode .sticky-header .dropdown-toggle {
+        color: #333 !important; 
+        background-color: #fff;
+        border-color: #ccc;
+    }
+
+    /* PROCESSING OVERLAY (BULK) - Dark Theme */
+    #bulk-process-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.85);
+        z-index: 3000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        color: #fff;
+    }
+    .processing-box { width: 80%; max-width: 400px; text-align: center; }
+
+    /* PAGINATION LOADING OVERLAY (MATCHING LAYOUT.HTML) */
+    /* Light Theme (White BG, Dark Text) */
+    #pagination-loading-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(255, 255, 255, 0.95); /* Bright White */
+        z-index: 10001;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column; 
+    }
+    .loading-box { 
+        width: 80%; 
+        max-width: 400px; 
+        text-align: center; 
+    }
+
+    /* Selection Visuals */
+    .bulk-mode .book.session { cursor: crosshair; }
+    .bulk-mode .cover a { pointer-events: none; }
+    
+    .bulk-mode .cover { transition: transform 0.2s; }
+    .bulk-mode .book.selected .cover {
+        transform: scale(0.92);
+        box-shadow: 0 0 0 4px #007bff;
+        border-radius: 4px;
+    }
+    .bulk-select-overlay {
+        display: none;
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 40px;
+        color: #007bff;
+        text-shadow: 0 2px 4px rgba(255,255,255,0.8);
+        z-index: 20;
+        pointer-events: none;
+    }
+    .book.selected .bulk-select-overlay { display: block; }
+
+    /* --- ENLARGE GEAR ICON TOUCH AREA FOR IPAD --- */
+    .gear-btn {
+        padding: 15px 20px !important;  /* Creates a massive invisible touch target */
+        margin: -10px -15px !important; /* Prevents the header layout from shifting */
+        cursor: pointer;
+        display: inline-block;
+    }
+    
+    .gear-btn .glyphicon-cog {
+        font-size: 22px !important;     /* Makes the visual gear slightly larger */
+        vertical-align: middle;
+        color: #555;                    /* Ensures good contrast */
+    }
+
+    /* Hide the gear menu entirely while in Bulk Edit mode */
+    .bulk-mode .header-top .dropdown { display: none !important; }
+
+    /* USER RATING PILL */
+    .user-rating-pill {
+        position: absolute;
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.75);
+        color: #ffff00; /* Star color */
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        line-height: 1.2;
+        letter-spacing: 1px;
+        pointer-events: none;
+        z-index: 15;
+        white-space: nowrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    }
+    .user-rating-pill .star-dot { 
+        color: #888; 
+        font-size: 10px; 
+        vertical-align: middle; 
+        margin: 0 1px;
+        position: relative;
+        top: -1px; /* Nudges the dot up to perfectly align with the stars */
+    }
+</style>
+{% endblock %}
+
+{% block js %}
+<script>
+$(document).ready(function() {
+    
+    function setCookie(name, value, days) {
+        var expires = "";
+        if (days) {
+            var date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+    }
+
+    function getCookie(name) {
+        var nameEQ = name + "=";
+        var ca = document.cookie.split(';');
+        for(var i=0; i < ca.length; i++) {
+            var c = ca[i];
+            while (c.charAt(0)==' ') c = c.substring(1,c.length);
+            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+        }
+        return null;
+    }
+
+    $('#toggle-series-first').click(function(e) {
+        e.preventDefault();
+        var current = getCookie('cw_series_first');
+        setCookie('cw_series_first', current === '1' ? '0' : '1', 365);
+        window.location.reload();
+    });
+
+    $('#toggle-user-ratings').click(function(e) {
+        e.preventDefault();
+        var current = getCookie('cw_show_user_ratings');
+        var nextState = (current === null || current === '1') ? '0' : '1';
+        setCookie('cw_show_user_ratings', nextState, 365);
+        window.location.reload();
+    });
+
+    $('#toggle-stack-series').click(function(e) {
+        e.preventDefault();
+        var shelfId = $(this).data('shelf-id');
+        $.ajax({
+            url: "{{ url_for('shelf.toggle_stack', shelf_id=0) }}".replace('0', shelfId),
+            type: 'POST',
+            data: { csrf_token: csrfToken },
+            success: function() {
+                window.location.reload();
+            }
+        });
+    });
+
+    $('.page-link').click(function(e) {
+        var $pagination = $(this).closest('.pagination');
+        if ($pagination.length === 0) return; 
+        var perPage = parseInt($pagination.data('per-page')) || 20;
+        var total = parseInt($pagination.data('total')) || 0;
+        var $activeItem = $pagination.find('.page-item.active');
+        var currentPage = 1;
+        if ($activeItem.length) {
+            currentPage = parseInt($activeItem.text());
+        }
+        var targetPage = currentPage;
+        var $parent = $(this).parent(); 
+        if ($parent.hasClass('page-next') || $(this).hasClass('next')) {
+            targetPage = currentPage + 1;
+        } else if ($parent.hasClass('page-previous') || $(this).hasClass('previous')) {
+            targetPage = currentPage - 1;
+        } else {
+            var textVal = parseInt($(this).text());
+            if (!isNaN(textVal)) { targetPage = textVal; }
+        }
+        if (targetPage < 1) targetPage = 1;
+        var startIdx = (targetPage - 1) * perPage + 1;
+        var endIdx = Math.min(startIdx + perPage - 1, total);
+        if (total > 0) {
+            $('#pagination-loading-text').text("{{ _('Retrieving Page') }} " + targetPage + ": {{ _('Books') }} " + startIdx + " - " + endIdx);
+        } else {
+            $('#pagination-loading-text').text("{{ _('Retrieving books...') }}");
+        }
+        $('#pagination-loading-overlay').css('display', 'flex');
+    });
+
+    var isBulkMode = false;
+    var currentShelfId = $('#shelf-meta').data('current-shelf-id');
+    var csrfToken = $('#shelf-meta').data('csrf');
+    var jsWishlistId = null;
+    {% if current_user.is_authenticated %}
+        {% for shelf in g.shelves_access %}
+            {% if "wishlist" in shelf.name|string|lower %}
+                jsWishlistId = {{ shelf.id }};
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    $('#menu-bulk-edit').click(function(e) {
+        e.preventDefault();
+        enterBulkMode();
+    });
+
+    $('#btn-cancel-bulk').click(exitBulkMode);
+
+    function enterBulkMode() {
+        isBulkMode = true;
+        $('body').addClass('bulk-mode');
+        $('#bulk-action-bar').slideDown();
+        $('.cover a').each(function() {
+            var $a = $(this);
+            $a.data('orig-toggle', $a.attr('data-toggle'));
+            $a.data('orig-href', $a.attr('href'));
+            $a.removeAttr('data-toggle');
+            $a.attr('href', 'javascript:void(0);');
+        });
+    }
+
+    function exitBulkMode() {
+        isBulkMode = false;
+        $('body').removeClass('bulk-mode');
+        $('#bulk-action-bar').slideUp();
+        $('.book.selected').removeClass('selected');
+        updateCount();
+        $('.cover a').each(function() {
+            var $a = $(this);
+            if ($a.data('orig-toggle')) $a.attr('data-toggle', $a.data('orig-toggle'));
+            if ($a.data('orig-href')) $a.attr('href', $a.data('orig-href'));
+        });
+    }
+
+    $(document).on('click', '.book.session', function(e) {
+        if (isBulkMode) {
+            e.preventDefault(); 
+            e.stopImmediatePropagation();
+            $(this).toggleClass('selected');
+            updateCount();
+        } else {
+            if ($(e.target).closest('a').length === 0) {
+                $(this).find('.cover a').trigger('click');
+            }
+        }
+    });
+
+    $('#bulk-select-all').click(function() { $('.book.session').addClass('selected'); updateCount(); });
+    $('#bulk-select-none').click(function() { $('.book.session').removeClass('selected'); updateCount(); });
+
+    function updateCount() { $('#selection-count').text($('.book.selected').length); }
+    
+    $('#bulk-target-list a').click(function(e) {
+        e.preventDefault();
+        var shelfId = $(this).data('value');
+        var shelfName = $(this).text();
+        $('#bulk-target-shelf').val(shelfId);
+        $('#bulk-target-label').text(shelfName);
+        $('#btn-copy, #btn-move').prop('disabled', false);
+    });
+
+    function processQueue(queue, actionName, reloadOnComplete = true) {
+        var total = queue.length;
+        var current = 0;
+        if (total === 0) { alert("{{ _('No books selected!') }}"); return; }
+        $('#bulk-process-overlay').css('display', 'flex');
+        function next() {
+            if (current >= total) {
+                if (reloadOnComplete) { location.reload(); } else { $('#bulk-process-overlay').hide(); exitBulkMode(); }
+                return;
+            }
+            var item = queue[current];
+            var progress = Math.round((current / total) * 100);
+            $('#bulk-progress-bar').css('width', progress + '%');
+            $('#bulk-status-text').text(actionName + ": " + (current + 1) + " / " + total);
+            $.ajax({
+                url: item.url,
+                type: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                data: { csrf_token: csrfToken },
+                complete: function() {
+                    if (item.onSuccess) item.onSuccess();
+                    current++;
+                    next();
+                }
+            });
+        }
+        next();
+    }
+
+    $('#btn-remove').click(function() {
+        var selected = $('.book.selected');
+        if (!confirm("{{ _('Remove selected books from this shelf?') }}")) return;
+        var queue = [];
+        selected.each(function() {
+            var bookId = $(this).find('.cover').data('book-id');
+            var url = "{{ url_for('shelf.remove_from_shelf', shelf_id=shelf.id, book_id='999999') }}".replace('999999', bookId);
+            queue.push({ url: url });
+        });
+        processQueue(queue, "Removing");
+    });
+
+    $('#btn-copy').click(function() {
+        var targetId = $('#bulk-target-shelf').val();
+        var queue = [];
+        $('.book.selected').each(function() {
+            var bookId = $(this).find('.cover').data('book-id');
+            var url = "{{ url_for('shelf.add_to_shelf', shelf_id='888888', book_id='999999') }}".replace('888888', targetId).replace('999999', bookId);
+            queue.push({ url: url });
+        });
+        processQueue(queue, "Copying");
+    });
+
+    $('#btn-move').click(function() {
+        var targetId = $('#bulk-target-shelf').val();
+        if (!confirm("{{ _('Move selected books? They will be removed from the current shelf.') }}")) return;
+        var queue = [];
+        $('.book.selected').each(function() {
+            var bookId = $(this).find('.cover').data('book-id');
+            var addUrl = "{{ url_for('shelf.add_to_shelf', shelf_id='888888', book_id='999999') }}".replace('888888', targetId).replace('999999', bookId);
+            var remUrl = "{{ url_for('shelf.remove_from_shelf', shelf_id=shelf.id, book_id='999999') }}".replace('999999', bookId);
+            queue.push({ url: addUrl });
+            queue.push({ url: remUrl });
+        });
+        processQueue(queue, "Moving");
+    });
+    
+    $('#btn-bulk-wishlist').click(function() {
+        if (!jsWishlistId) { alert("Wishlist not found."); return; }
+        var queue = [];
+        $('.book.selected').each(function() {
+            var $container = $(this);
+            var bookId = $container.find('.cover').data('book-id');
+            var url = "{{ url_for('shelf.add_to_shelf', shelf_id='888888', book_id='999999') }}".replace('888888', jsWishlistId).replace('999999', bookId);
+            queue.push({ 
+                url: url,
+                onSuccess: function() {
+                    var $img = $container.find('.cover .img');
+                    if ($img.find('.wishlist-overlay').length === 0) {
+                        $img.append('<div class="wishlist-overlay"><span class="glyphicon glyphicon-heart"></span></div>');
+                    }
+                }
+            });
+        });
+        processQueue(queue, "Adding to Wishlist", false);
+    });
+});
+</script>
+{% endblock %}

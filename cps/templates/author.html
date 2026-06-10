@@ -1,0 +1,543 @@
+{% import 'image.html' as image %}
+{% extends "layout.html" %}
+{% block body %}
+
+{% set wishlist_ns = namespace(id=None) %}
+{% if current_user.is_authenticated %}
+    {% for shelf in g.shelves_access %}
+        {% if "wishlist" in shelf.name|string|lower %}
+            {% set wishlist_ns.id = shelf.id %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
+{% set wishlist_id = wishlist_ns.id %}
+
+{% set query_str = '' %}
+{% if request.args.get('series_first') == '1' %}{% set query_str = query_str ~ '&series_first=1' %}{% endif %}
+{% if request.args.get('stack') == '1' %}{% set query_str = query_str ~ '&stack=1' %}{% endif %}
+{% if query_str|length > 0 %}{% set query_str = '?' ~ query_str[1:] %}{% endif %}
+
+<div class="sticky-header {% if pagination and (pagination.has_next or pagination.has_prev) %}has-pagination{% endif %}">
+    <div class="header-top">
+      <div class="dropdown">
+        <div class="gear-btn dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <span class="glyphicon glyphicon-cog"></span>
+        </div>
+        <ul class="dropdown-menu">
+            <li class="dropdown-header">{{_('Sort By')}}</li>
+            <li><a href="{{url_for('web.books_list', data='author', book_id=id, sort_param='new')}}">
+                <span class="glyphicon glyphicon-ok" {% if order != 'new' %}style="visibility:hidden;"{% endif %}></span> {{_('Date Added (Newest)')}}
+            </a></li>
+            <li><a href="{{url_for('web.books_list', data='author', book_id=id, sort_param='old')}}">
+                <span class="glyphicon glyphicon-ok" {% if order != 'old' %}style="visibility:hidden;"{% endif %}></span> {{_('Date Added (Oldest)')}}
+            </a></li>
+            <li class="divider"></li>
+            <li><a href="{{url_for('web.books_list', data='author', book_id=id, sort_param='abc')}}">
+                <span class="glyphicon glyphicon-ok" {% if order != 'abc' %}style="visibility:hidden;"{% endif %}></span> {{_('Title (A-Z)')}}
+            </a></li>
+            <li><a href="{{url_for('web.books_list', data='author', book_id=id, sort_param='zyx')}}">
+                <span class="glyphicon glyphicon-ok" {% if order != 'zyx' %}style="visibility:hidden;"{% endif %}></span> {{_('Title (Z-A)')}}
+            </a></li>
+            <li class="divider"></li>
+            <li><a href="{{url_for('web.books_list', data='author', book_id=id, sort_param='pubnew')}}">
+                <span class="glyphicon glyphicon-ok" {% if order != 'pubnew' %}style="visibility:hidden;"{% endif %}></span> {{_('Pub Date (Newest)')}}
+            </a></li>
+            <li><a href="{{url_for('web.books_list', data='author', book_id=id, sort_param='pubold')}}">
+                <span class="glyphicon glyphicon-ok" {% if order != 'pubold' %}style="visibility:hidden;"{% endif %}></span> {{_('Pub Date (Oldest)')}}
+            </a></li>
+            
+            <li class="divider"></li>
+            <li class="dropdown-header">{{_('View Modifiers')}}</li>
+            <li>
+                <a href="#" id="toggle-user-ratings">
+                    <span class="glyphicon glyphicon-{% if request.cookies.get('cw_show_user_ratings', '1') == '1' %}check{% else %}unchecked{% endif %}"></span> {{_('Show User Ratings')}}
+                </a>
+            </li>
+            <li>
+                <a href="#" id="toggle-series-first">
+                    <span class="glyphicon glyphicon-{% if request.cookies.get('cw_series_first') == '1' %}check{% else %}unchecked{% endif %}"></span> {{_('Series First')}}
+                </a>
+            </li>
+            <li>
+                <a href="#" id="toggle-stack-series">
+                    <span class="glyphicon glyphicon-{% if request.cookies.get('cw_stack_series') == '1' %}check{% else %}unchecked{% endif %}"></span> {{_('Stack Series')}}
+                </a>
+            </li>
+        </ul>
+      </div>
+      
+      <h2>
+        {{title}}
+        <small>
+            {% if pagination %}
+                {% if entries|length > 0 %}
+                    {% set start_idx = (pagination.page - 1) * pagination.per_page + 1 %}
+                    {% set end_idx = start_idx + entries|length - 1 %}
+                    [{{_('Books')}} {{ start_idx }} {{_('-')}} {{ end_idx }} {{_('out of')}} {{ pagination.total_count }}]
+                {% else %}
+                    [0 {{_('Books')}}]
+                {% endif %}
+            {% elif entries %}
+                [{{entries|length}}]
+            {% else %}
+                [0 {{_('Books')}}]
+            {% endif %}
+        </small>
+      </h2>
+    </div>
+
+    <div class="header-bottom">
+       {% if pagination and (pagination.has_next or pagination.has_prev) %}
+           <div class="pagination" data-per-page="{{ pagination.per_page }}" data-total="{{ pagination.total_count }}" style="display: block; text-align: left; margin-top: 5px; margin-bottom: 0px;">
+             {% if pagination.has_prev %}
+             <li class="page-item page-previous" style="display: inline-block;"><a class="page-link" aria-label="next page" href="{{ (pagination.page - 1)|url_for_other_page }}">&laquo; {{_('Previous')}}</a></li>
+             {% endif %}
+           {% for page in pagination.iter_pages() %}
+             {% if page %}
+               {% if page != pagination.page %}
+                 <li class="page-item" style="display: inline-block;"><a class="page-link" aria-label="to page {{ page }}" href="{{ (page)|url_for_other_page }}">{{ page }}</a></li>
+               {% else %}
+                 <li class="page-item active" style="display: inline-block;"><a class="page-link" aria-label="to page {{ page }}" href="{{ (page)|url_for_other_page }}">{{ page }}</a></li>
+               {% endif %}
+             {% else %}
+               <li class="page-item page-last-separator disabled" style="display: inline-block;"><a class="page-link" aria-label="">…</a></li>
+             {% endif %}
+           {% endfor %}
+           {% if pagination.has_next %}
+             <li class="page-item page-next" style="display: inline-block;"><a class="page-link next" aria-label="next page" href="{{ (pagination.page + 1)|url_for_other_page }}">{{_('Next')}} &raquo;</a></li>
+           {% endif %}
+           </div>
+       {% endif %}
+    </div>
+</div>
+
+<div id="pagination-loading-overlay">
+    <div class="loading-box">
+        <div class="spinner-blue"></div>
+        <h3 id="pagination-title">{{ _('Loading...') }}</h3>
+        <p id="pagination-loading-text"></p>
+    </div>
+</div>
+
+<div class="browse-books">
+    {% if author is not none %}
+    <section class="author-bio" style="padding: 0 10px 15px 10px;">
+      {%if author.image_url is not none %}
+      <img title="{{author.name}}" src="{{author.image_url}}" alt="{{author.name}}" class="author-photo pull-left" style="margin-right: 15px; margin-bottom: 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+      {% endif %}
+
+      {%if author.safe_about is not none %}
+      <div style="font-size: 14px; line-height: 1.6; color: #555;">{{author.safe_about|safe}}</div>
+      {% endif %}
+
+      <div style="margin-top: 10px;">- {{_("via")}} <a href="{{author.link}}" class="author-link" target="_blank" rel="noopener">Goodreads</a></div>
+    </section>
+    <div class="clearfix"></div>
+    <hr style="margin: 0 10px 20px 10px;">
+    {% endif %}
+
+    <div class="discover load-more">
+      {% if author is not none %}
+        <h3 style="margin-left: 10px; margin-top: 0;">{{_("In Library")}}</h3>
+      {% endif %}
+      
+      <div class="row display-flex" style="margin-left: 0; margin-right: 0;">
+        {% for entry in entries %}
+        
+        {% set current_book_id = entry.Books.id if entry.Books else (entry[0].id if entry[0] else entry.id) %}
+        {% set current_book = entry.Books if entry.Books else (entry[0] if entry[0] else entry) %}
+
+        <div id="books" class="col-sm-3 col-lg-2 col-xs-6 book session" style="padding-left: 10px; padding-right: 10px;"
+             {% if request.cookies.get('cw_stack_series') == '1' and current_book.series|length > 0 %}
+                data-series-id="{{ current_book.series[0].id }}"
+                data-series-name="{{ current_book.series[0].name }}"
+                data-series-count="{{ current_book.series[0].books|length }}"
+             {% endif %}
+        >
+          <div class="cover {% if entry[2] == True %}read-book-dimmed{% endif %}" data-book-id="{{ current_book_id }}">
+            <a href="{{ url_for('web.show_book', book_id=current_book_id) }}" {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}>
+                <span class="img" title="{{current_book.title}}">
+                  {{ image.book_cover(current_book, alt=author.name|safe) }}
+                  
+                  {% if entry[2] == True %}
+                      <div class="read-overlay"><span class="glyphicon glyphicon-ok"></span> {{_('READ')}}</div>
+                  {% endif %}
+                  
+                  {% if current_book_id|int in global_wishlist_ids %}
+                        <div class="wishlist-overlay"><span class="glyphicon glyphicon-heart"></span></div>
+                  {% endif %}
+                  
+                  {% if request.cookies.get('cw_show_user_ratings', '1') == '1' %}
+                      {% set u_rating = global_user_ratings.get(current_book_id|int) %}
+                      {% if u_rating %}
+                          <div class="user-rating-pill">
+                              {% set stars = (u_rating / 2)|int %}
+                              {% for i in range(stars) %}&#9733;{% endfor %}{% for i in range(5 - stars) %}<span class="star-dot">&#9679;</span>{% endfor %}
+                          </div>
+                      {% endif %}
+                  {% endif %}
+                </span>
+            </a>
+          </div>
+          
+        {% set prog = global_reading_progress.get(current_book_id|int) %}
+        {% if prog is not none %}
+            <div style="height: 5px; background: #e0e0e0; border-radius: 3px; margin-top: 8px; margin-bottom: -3px; overflow: hidden; width: 100%;">
+                <div style="height: 100%; background: #007bff; width: {{ prog }}%; border-radius: 3px;"></div>
+            </div>
+        {% endif %}
+
+          <div class="meta">
+            <a href="{{ url_for('web.show_book', book_id=current_book_id) }}" {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}>
+              <p title="{{ current_book.title }}" class="title">{{current_book.title|shortentitle}}</p>
+            </a>
+            <p class="author">
+              {% for author in current_book.authors %}
+                {% if loop.index > g.config_authors_max and g.config_authors_max != 0 %}
+                  {% if not loop.first %}<span class="author-hidden-divider">&amp;</span>{% endif %}
+                  <a class="author-name author-hidden" href="{{url_for('web.books_list',  data='author', sort_param='stored', book_id=author.id) }}">{{author.name.replace('|',',')|shortentitle(30)}}</a>
+                  {% if loop.last %}
+                    <a href="#" class="author-expand" data-authors-max="{{g.config_authors_max}}" data-collapse-caption="({{_('reduce')}})">(...)</a>
+                  {% endif %}
+                {% else %}
+                  {% if not loop.first %}<span>&amp;</span>{% endif %}
+                  <a class="author-name" href="{{url_for('web.books_list',  data='author', sort_param='stored', book_id=author.id) }}">{{author.name.replace('|',',')|shortentitle(30)}}</a>
+                {% endif %}
+              {% endfor %}
+              {% if current_book.data|music %}<span class="glyphicon glyphicon-music"></span>{% endif %}
+            </p>
+            {% if current_book.series.__len__() > 0 %}
+                <p class="series">
+                <a href="{{url_for('web.books_list', data='series', sort_param='stored', book_id=current_book.series[0].id )}}">
+                    {{current_book.series[0].name}}
+                </a>
+                {% if current_book.series_index|float > 0 %}
+                    [{{current_book.series_index|formatfloat(2)}}]
+                {% endif %}
+                </p>
+            {% endif %}
+            {% if current_book.ratings.__len__() > 0 %}
+            <div class="rating">
+              {% for number in range((current_book.ratings[0].rating/2)|int(2)) %}
+              <span class="glyphicon glyphicon-star good"></span>
+              {% if loop.last and loop.index < 5 %}
+              {% for numer in range(5 - loop.index) %}
+              <span class="glyphicon glyphicon-star-empty"></span>
+              {% endfor %}
+              {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if other_books and author is not none %}
+    <div class="discover">
+      <h3 style="margin-left: 10px; border-top: 1px solid #eee; padding-top: 20px;">{{_("More by")}} {{ author.name.replace('|',',') }}</h3>
+      <div class="row display-flex" style="margin-left: 0; margin-right: 0;">
+        {% for entry in other_books %}
+        <div class="col-sm-3 col-lg-2 col-xs-6 book" style="padding-left: 10px; padding-right: 10px;">
+          <div class="cover">
+            <a href="https://www.goodreads.com/book/show/{{ entry.gid['#text'] }}" target="_blank" rel="noopener">
+              <span class="img">
+                <img title="{{entry.title}}" src="{{ entry.image_url }}" />
+              </span>
+            </a>
+          </div>
+          <div class="meta">
+            <p title="{{ entry.title }}" class="title">{{entry.title|shortentitle}}</p>
+            <p class="author">
+              {% for author in entry.authors %}
+                {% if loop.index > g.config_authors_max and g.config_authors_max != 0 %}
+                    <a class="author-name author-hidden" href="https://www.goodreads.com/author/show/{{ author.gid }}" target="_blank" rel="noopener">{{author.name.replace('|',',')}}</a>
+                    {% if loop.last %}
+                        <a href="#" class="author-expand" data-authors-max="{{g.config_authors_max}}" data-collapse-caption="({{_('reduce')}})">(...)</a>
+                    {% endif %}
+                {% else %}
+                    <a class="author-name" href="https://www.goodreads.com/author/show/{{ author.gid }}" target="_blank" rel="noopener">{{author.name.replace('|',',')}}</a>
+                {% endif %}
+              {% endfor %}
+            </p>
+            {% if entry.series.__len__() > 0 %}
+            <p class="series">
+              <a href="{{url_for('web.books_list', data='series', sort_param='stored', book_id=entry.series[0].id )}}">
+                {{entry.series[0].name}}
+              </a>
+              ({{entry.series_index|formatfloat(2)}})
+            </p>
+            {% endif %}
+            <div class="rating">
+              {% for number in range((entry.average_rating)|float|round|int(2)) %}
+              <span class="glyphicon glyphicon-star good"></span>
+              {% if loop.last and loop.index < 5 %}
+              {% for numer in range(5 - loop.index) %}
+              <span class="glyphicon glyphicon-star-empty"></span>
+              {% endfor %}
+              {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <a href="{{author.link}}" class="author-link" target="_blank" rel="noopener" style="margin-left: 10px; display: inline-block; margin-bottom: 20px;">
+        <img src="{{ url_for('static', filename='img/goodreads.svg') }}" alt="Goodreads">
+      </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    /* --- UNIFORM COVER SIZING (COVER + FLAT GRAY STACK) --- */
+    .book.session .cover, .book .cover {
+        margin-bottom: 12px !important; 
+        position: relative !important;
+    }
+    
+    .book.session .cover .img, .book .cover .img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 2 / 2.8; /* Custom Ratio */
+        background-color: #f4f4f4; /* Neutral backdrop */
+        border-radius: 4px;
+        position: relative;
+        z-index: 1; /* Essential for Stack rendering */
+    }
+    
+    .book.session .cover .img img, .book .cover .img img {
+        display: block; 
+        width: 100%;
+        height: 100%;
+        border-radius: inherit;
+        object-fit: fill; /* Forces the image to stretch and distort to fill the box perfectly */
+    }
+
+    /* --- FLAT CSS STACK EFFECT --- */
+    .book.session.is-stack .img {
+        border: none; /* Removes the border to prevent white edge artifacts */
+        margin-bottom: 8px; /* Leave room for stack layers below */
+        margin-right: 8px;
+        
+        /* Solid light gray and lighter gray rectangles */
+        box-shadow:
+            4px 4px 0 0px #cccccc,
+            8px 8px 0 0px #e6e6e6;
+    }
+    /* ---------------------------------------------------- */
+
+    body { overflow-y: hidden !important; }
+    
+    /* ADDED MARGIN-BOTTOM FOR ROW SPACING */
+    .book.session, .book { 
+        cursor: pointer; 
+        margin-bottom: 10px; 
+    }
+    
+    @media (min-width: 768px) {
+        .browse-books { margin-top: 85px !important; height: calc(100vh - 150px) !important; overflow-y: auto; }
+    }
+
+    .read-overlay {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.75);
+        color: #fff;
+        padding: 6px 10px;
+        border-radius: 4px;
+        border: 1px solid rgba(255,255,255,0.4);
+        font-weight: bold; font-size: 13px;
+        text-transform: uppercase;
+        pointer-events: none; z-index: 10;
+        white-space: nowrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .read-book-dimmed img { 
+        opacity: 0.6; 
+        filter: grayscale(100%); 
+        transition: filter 0.3s ease, opacity 0.3s ease; 
+    }
+    .read-book-dimmed:hover img { 
+        opacity: 1.0; 
+        filter: grayscale(0%); 
+    }
+
+    .wishlist-overlay {
+        position: absolute;
+        top: 6px; left: 6px;
+        width: 30px; height: 30px;
+        background: #fff;
+        border-radius: 50%;
+        border: 1px solid #ccc;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 15; 
+        pointer-events: none;
+    }
+    .wishlist-overlay .glyphicon { color: #d9534f; font-size: 17px; top: 1px; }
+
+    @media (max-width: 991px) {
+        #sidebar { width: 25% !important; float: left !important; display: block !important; padding-right: 10px !important; }
+        #sidebar + div, #sidebar + .col-sm-9 { width: 75% !important; float: left !important; display: block !important; }
+    }
+
+    /* --- ENLARGE GEAR ICON TOUCH AREA FOR IPAD --- */
+    .gear-btn {
+        padding: 15px 20px !important;  /* Creates a massive invisible touch target */
+        margin: -10px -15px !important; /* Prevents the header layout from shifting */
+        cursor: pointer;
+        display: inline-block;
+    }
+    
+    .gear-btn .glyphicon-cog {
+        font-size: 22px !important;     /* Makes the visual gear slightly larger */
+        vertical-align: middle;
+        color: #555;                    /* Ensures good contrast */
+    }
+
+    /* USER RATING PILL */
+    .user-rating-pill {
+        position: absolute;
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.75);
+        color: #ffff00; /* Star color */
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        line-height: 1.2;
+        letter-spacing: 1px;
+        pointer-events: none;
+        z-index: 15;
+        white-space: nowrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    }
+    .user-rating-pill .star-dot { 
+        color: #888; 
+        font-size: 10px; 
+        vertical-align: middle; 
+        margin: 0 1px;
+        position: relative;
+        top: -1px;
+    }
+</style>
+{% endblock %}
+
+{% block js %}
+<script>
+    $(document).ready(function() {
+        
+        // --- COOKIE HANDLERS ---
+        function setCookie(name, value, days) {
+            var expires = "";
+            if (days) {
+                var date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+        }
+
+        function getCookie(name) {
+            var nameEQ = name + "=";
+            var ca = document.cookie.split(';');
+            for(var i=0; i < ca.length; i++) {
+                var c = ca[i];
+                while (c.charAt(0)==' ') c = c.substring(1,c.length);
+                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+            }
+            return null;
+        }
+
+        // --- 1. MODIFIER TOGGLE LOGIC (WITH COOKIES) ---
+        $('#toggle-series-first').click(function(e) {
+            e.preventDefault();
+            var current = getCookie('cw_series_first');
+            setCookie('cw_series_first', current === '1' ? '0' : '1', 365);
+            window.location.reload();
+        });
+
+        $('#toggle-stack-series').click(function(e) {
+            e.preventDefault();
+            var current = getCookie('cw_stack_series');
+            setCookie('cw_stack_series', current === '1' ? '0' : '1', 365);
+            window.location.reload();
+        });
+
+        $('#toggle-user-ratings').click(function(e) {
+            e.preventDefault();
+            var current = getCookie('cw_show_user_ratings');
+            var nextState = (current === null || current === '1') ? '0' : '1';
+            setCookie('cw_show_user_ratings', nextState, 365);
+            window.location.reload();
+        });
+
+        // --- 2. JS SERIES STACKING VISUALS ---
+        var isStackMode = {{ 'true' if request.cookies.get('cw_stack_series') == '1' else 'false' }};
+        
+        if (isStackMode) {
+            $('.book.session').each(function() {
+                var $book = $(this);
+                var seriesId = $book.data('series-id');
+                
+                if (seriesId) {
+                    var seriesCount = parseInt($book.data('series-count')) || 1;
+                    
+                    // ONLY CREATE A STACK IF THE SERIES CONTAINS MORE THAN 1 BOOK
+                    if (seriesCount > 1) {
+                        var seriesName = $book.data('series-name');
+                        
+                        $book.addClass('is-stack'); // Triggers CSS box-shadow
+                        var $cover = $book.find('.cover');
+
+                        // Add the Total Books Badge (Top Right)
+                        $cover.append('<div class="stack-badge" style="position:absolute; top:-8px; right:-8px; background:#337ab7; color:#fff; font-size:12px; padding:3px 7px; border-radius:12px; font-weight:bold; z-index:20;"><span class="glyphicon glyphicon-book" style="margin-right:4px;"></span>' + seriesCount + '</div>');
+
+                        var seriesUrl = "{{ url_for('web.books_list', data='series', sort_param='stored', book_id='999999') }}".replace('999999', seriesId);
+                        
+                        $cover.find('a').attr('href', seriesUrl).removeAttr('data-toggle').removeAttr('data-target');
+                        $book.find('.meta a').first().attr('href', seriesUrl).removeAttr('data-toggle').removeAttr('data-target');
+                        $book.find('.meta .title').text(seriesName + " (Series)");
+                        $book.find('.meta .series').hide();
+                    }
+                }
+            });
+        }
+
+        // --- 3. PAGINATION LOADING SPINNER ---
+        $('.page-link').click(function(e) {
+            var $pagination = $(this).closest('.pagination');
+            if ($pagination.length === 0) return; 
+
+            var perPage = parseInt($pagination.data('per-page')) || 20;
+            var total = parseInt($pagination.data('total')) || 0;
+            var $activeItem = $pagination.find('.page-item.active');
+            var currentPage = 1;
+            if ($activeItem.length) currentPage = parseInt($activeItem.text());
+            
+            var targetPage = currentPage;
+            var $parent = $(this).parent(); 
+            
+            if ($parent.hasClass('page-next') || $(this).hasClass('next')) { targetPage = currentPage + 1; } 
+            else if ($parent.hasClass('page-previous') || $(this).hasClass('previous')) { targetPage = currentPage - 1; } 
+            else {
+                var textVal = parseInt($(this).text());
+                if (!isNaN(textVal)) targetPage = textVal;
+            }
+            if (targetPage < 1) targetPage = 1;
+            
+            var startIdx = (targetPage - 1) * perPage + 1;
+            var endIdx = Math.min(startIdx + perPage - 1, total);
+            
+            if (total > 0) $('#pagination-loading-text').text("{{ _('Retrieving Page') }} " + targetPage + ": {{ _('Books') }} " + startIdx + " - " + endIdx);
+            else $('#pagination-loading-text').text("{{ _('Retrieving books...') }}");
+            $('#pagination-loading-overlay').css('display', 'flex');
+        });
+    });
+</script>
+{% endblock %}

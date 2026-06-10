@@ -1,0 +1,587 @@
+{% extends "layout.html" %}
+{% block body %}
+
+{% if data == "category" %}
+<script>
+    if (localStorage.getItem('calibre_tree_view') === 'true') {
+        document.documentElement.classList.add('is-tree-view');
+    }
+</script>
+{% endif %}
+
+<div class="sticky-header">
+    <div class="header-top">
+        
+        <div class="dropdown">
+            <div class="gear-btn dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <span class="glyphicon glyphicon-cog"></span>
+            </div>
+            <ul class="dropdown-menu">
+                <li class="dropdown-header">{{_('Sort & View')}}</li>
+                
+                <li>
+                    <a href="#" id="asc" data-order="{{ order }}" data-id="{{ data }}">
+                        <span class="glyphicon glyphicon-ok sort-icon" {% if order == 'desc' %}style="visibility:hidden;"{% endif %}></span> 
+                        <span class="glyphicon glyphicon-sort-by-alphabet"></span> {{_('Sort A-Z')}}
+                    </a>
+                </li>
+                
+                <li>
+                    <a href="#" id="desc" data-id="{{ data }}">
+                        <span class="glyphicon glyphicon-ok sort-icon" {% if order != 'desc' %}style="visibility:hidden;"{% endif %}></span> 
+                        <span class="glyphicon glyphicon-sort-by-alphabet-alt"></span> {{_('Sort Z-A')}}
+                    </a>
+                </li>
+                
+                {% if entries.__len__() and data == 'author' %}
+                <li class="divider"></li>
+                <li><a href="#" id="sort_name"><span class="glyphicon glyphicon-user"></span> {{_('Toggle Name (First/Last)')}}</a></li>
+                {% endif %}
+
+                {% if data == "series" %}
+                <li class="divider"></li>
+                <li><a href="#" id="grid-button" class="update-view" data-target="series_view" data-view="grid"><span class="glyphicon glyphicon-th"></span> {{_('Grid View')}}</a></li>
+                {% endif %}
+
+                {% if data == "category" %}
+                <li class="divider"></li>
+                <li>
+                    <a href="#" id="tree-button">
+                        <span id="tree-check" class="glyphicon glyphicon-unchecked"></span> 
+                        <span class="glyphicon glyphicon-tree-conifer"></span> {{_('Tree View')}}
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+
+        <h2>{{_(title)}}</h2>
+    </div>
+
+    <div class="header-bottom filterheader">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      
+      <div class="btn-group character" role="group">
+        {% if charlist|length %}
+        <div id="all" class="btn btn-default active">{{_('All')}}</div>
+        {% endif %}
+        {% for char in charlist%}
+        <div class="btn btn-default char">{{char[0]}}</div>
+        {% endfor %}
+      </div>
+      
+    </div>
+</div>
+
+<div class="browse-books">
+  <div class="container-fluid">
+    
+    {% if data == "ratings" and user_entries and user_entries|length > 0 %}
+    <div class="user-ratings-section" style="margin-bottom: 40px;">
+        <h3 style="margin-top: 0; padding-bottom: 10px; border-bottom: 1px solid currentcolor;">
+            <span class="glyphicon glyphicon-user"></span> {{ _('My Ratings') }}
+        </h3>
+        <div class="list-view-grid">
+        {% for entry in user_entries %}
+          <div class="list-item row">
+            <a href="{{ url_for('web.user_ratings_books', sort_param='stored', book_id=entry[0].rating) }}">
+              <div class="rating text-success">
+              {% for number in range(entry[0].name|int) %}
+                <span class="glyphicon glyphicon-star good"></span>
+                {% if loop.last and loop.index < 5 %}
+                  {% for numer in range(5 - loop.index) %}
+                    <span class="glyphicon glyphicon-star-empty"></span>
+                  {% endfor %}
+                {% endif %}
+              {% endfor %}
+              </div>
+            </a>
+            <span class="badge">{{ entry[1] }}</span>
+          </div>
+        {% endfor %}
+        </div>
+    </div>
+    
+    <h3 style="padding-bottom: 10px; border-bottom: 1px solid currentcolor;">
+        <span class="glyphicon glyphicon-globe"></span> {{ _('Global Ratings') }}
+    </h3>
+    {% endif %}
+    <div id="list" class="list-view-grid">
+    {% for entry in entries %}
+      <div class="list-item row sort-item sortable" 
+           {% if entry[0].sort %}data-name="{{entry[0].name}}"{% endif %} 
+           data-name-raw="{% if entry[0].name %}{{entry[0].name}}{% else %}{{entry.format if entry.format else ''}}{% endif %}"
+           data-count="{{entry[1]}}"
+           data-id="{% if entry[0].sort %}{{entry[0].sort}}{% else %}{% if entry[0].format %}{{entry[0].format}}{% else %}{% if entry[0].rating %}{{entry[0].rating}}{% else %}{{entry[0].name}}{% endif %}{% endif %}{% endif %}">
+        
+        <a id="list_{{loop.index0}}" href="{% if entry.format %}{{url_for('web.books_list', data=data, sort_param='stored', book_id=entry.format )}}{% else %}{{url_for('web.books_list', data=data, sort_param='stored', book_id=entry[0].id )}}{% endif %}">
+          {% if entry.name %}
+              <div class="rating">
+              {% for number in range(entry.name|int) %}
+                <span class="glyphicon glyphicon-star good"></span>
+                {% if loop.last and loop.index < 5 %}
+                  {% for numer in range(5 - loop.index) %}
+                    <span class="glyphicon glyphicon-star-empty"></span>
+                  {% endfor %}
+                {% endif %}
+              {% endfor %}
+              </div>
+          {% else %}
+              {% if entry.format %}
+                {{entry.format}}
+              {% else %}
+                {{entry[0].name}}
+              {% endif %}
+          {% endif %}
+        </a>
+
+        <span class="badge">{{entry[1]}}</span>
+
+      </div>
+    {% endfor %}
+    </div>
+
+    <div id="tree-view" style="display: none;"></div>
+
+  </div>
+</div>
+
+<style>
+    body { overflow-y: hidden !important; }
+
+    /* --- ALPHABET FILTER BUTTONS (IPAD FRIENDLY) --- */
+    .filterheader .character {
+        display: flex !important;
+        flex-wrap: nowrap !important; /* Force a single row */
+        width: 100%;
+        margin-top: 8px;
+        overflow-x: auto; /* Allows sliding on tiny phone screens */
+        -webkit-overflow-scrolling: touch; /* Smooth iOS scrolling */
+        scrollbar-width: none; 
+    }
+    
+    .filterheader .character::-webkit-scrollbar {
+        display: none; /* Hides horizontal scrollbar */
+    }
+    
+    .filterheader .character .btn {
+        flex: 1 1 auto; 
+        padding: 8px 2px !important; /* Taller touch target, lean horizontal */
+        font-size: 14px !important;
+        margin: 0 3px !important;
+        border-radius: 4px !important; /* Overrides Bootstrap btn-group squaring */
+        float: none !important; 
+    }
+    /* ------------------------------------------------ */
+
+    /* RESPONSIVE GRID LAYOUT */
+    .list-view-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); 
+        gap: 10px; 
+        padding-bottom: 20px;
+    }
+
+    /* FLEXBOX ITEM */
+    .list-view-grid .list-item.row {
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between;
+        padding: 8px 10px;
+        background-color: #fff;
+        border: 1px solid #eee;
+        border-radius: 4px;
+        height: 100%;
+        margin-left: 0;
+        margin-right: 0;
+        width: 100%; 
+    }
+    
+    /* FIX: Ensure hidden items actually hide in Grid mode */
+    .list-view-grid .list-item[style*="display: none"] {
+        display: none !important;
+    }
+
+    .list-view-grid .list-item.row:before,
+    .list-view-grid .list-item.row:after {
+        display: none !important;
+    }
+
+    .list-item:hover { background-color: #f9f9f9; border-color: #ddd; }
+
+    .list-item a {
+        color: #333;
+        text-decoration: none;
+        white-space: nowrap;      
+        overflow: hidden;         
+        text-overflow: ellipsis;  
+        flex-grow: 1;             
+        margin-right: 10px;       
+        text-align: left;
+    }
+
+    .list-item .badge { flex-shrink: 0; background-color: #777; }
+
+    /* --- TREE VIEW STYLES --- */
+    #tree-view {
+        padding-bottom: 40px;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    /* ANTI-FLASH LOGIC */
+    .is-tree-view #list, 
+    .is-tree-view .filterheader {
+        display: none !important;
+    }
+    .is-tree-view #tree-view {
+        display: block !important;
+    }
+    
+    .tree-node { margin: 2px 0; }
+    
+    .tree-content {
+        display: flex;
+        align-items: center;
+        padding: 8px 12px;
+        background: #fff;
+        border-bottom: 1px solid #f0f0f0;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .tree-content:hover { background-color: #f5f5f5; }
+    
+    .tree-caret {
+        display: inline-block;
+        width: 24px;
+        text-align: center;
+        color: #999;
+        margin-right: 5px;
+        transition: transform 0.2s;
+    }
+    .tree-caret.expanded { transform: rotate(90deg); color: #333; }
+    .tree-caret.empty { opacity: 0; pointer-events: none; }
+    
+    .tree-link {
+        flex-grow: 1;
+        color: #333;
+        text-decoration: none;
+        font-weight: normal;
+        font-size: 15px;
+    }
+    .tree-link:hover { text-decoration: underline; }
+    
+    .tree-link.virtual { color: #777; cursor: default; text-decoration: none; }
+    
+    .tree-children {
+        display: none;
+        overflow: hidden;
+        border-left: 1px solid #eee;
+        margin-left: 23px; 
+    }
+
+    @media (min-width: 768px) {
+        .browse-books {
+            margin-top: 140px !important; 
+            height: calc(100vh - 190px) !important;
+        }
+    }
+    /* --- ENLARGE GEAR ICON TOUCH AREA FOR IPAD --- */
+    .gear-btn {
+        padding: 15px 20px !important;  
+        margin: -10px -15px !important; 
+        cursor: pointer;
+        display: inline-block;
+    }
+    
+    .gear-btn .glyphicon-cog {
+        font-size: 22px !important;     
+        vertical-align: middle;
+        color: #555;                    
+    }
+
+    /* --- DARK MODE OVERRIDES --- */
+    @media (prefers-color-scheme: dark) {
+        .rating .glyphicon-star.good {
+            color: #FFFF00 !important;
+        }
+        .rating .glyphicon-star-empty {
+            color: #999900 !important; /* Keeps empty stars visible */
+        }
+        .list-item .badge, .tree-content .badge {
+            background-color: #555 !important; 
+            color: #FFFFFF !important; 
+            font-weight: 800 !important;
+            opacity: 1.0 !important;
+            text-shadow: none !important;
+        }
+    }
+</style>
+
+{% endblock %}
+
+
+{% block js %}
+<script>
+    $(document).ready(function() {
+        
+        var currentSortOrder = '{{ order }}' || 'asc';
+        
+        // --- RESTORED FILTER LOGIC ---
+        $('#all').click(function() {
+            $(this).addClass('active');
+            $('.char').removeClass('active');
+            $('#list .list-item').show();
+        });
+
+        $('.char').click(function() {
+            var char = $(this).text().trim().toUpperCase();
+            $('.char').removeClass('active');
+            $('#all').removeClass('active');
+            $(this).addClass('active');
+            
+            $('#list .list-item').each(function() {
+                var name = $(this).data('name-raw');
+                if (name) {
+                    name = name.toString().toUpperCase();
+                    if (name.indexOf(char) === 0) { // Starts With
+                        $(this).show();
+                    } else {
+                        $(this).hide();
+                    }
+                } else {
+                    $(this).hide();
+                }
+            });
+        });
+
+        // --- STANDARD SORT LOGIC ---
+        var sort_list = function(order, criteria) {
+            var $list = $('#list');
+            var $items = $list.children('.sort-item'); 
+
+            $items.sort(function(a, b) {
+                var an = $(a).data(criteria);
+                var bn = $(b).data(criteria);
+
+                if (criteria === 'rating') {
+                    an = parseInt(an) || 0;
+                    bn = parseInt(bn) || 0;
+                } else {
+                    an = (an || "").toString().toLowerCase();
+                    bn = (bn || "").toString().toLowerCase();
+                }
+
+                if (an > bn) return (order == 'asc') ? 1 : -1;
+                if (an < bn) return (order == 'asc') ? -1 : 1;
+                return 0;
+            });
+
+            $items.detach().appendTo($list);
+        };
+
+        // --- SORT BUTTON HANDLERS ---
+        $('#asc').click(function(e) {
+            e.preventDefault();
+            currentSortOrder = 'asc';
+            
+            if (localStorage.getItem('calibre_tree_view') === 'true') {
+                rebuildTree();
+            } else {
+                var criteria = $(this).data('id') === 'rating' ? 'rating' : 'id';
+                sort_list('asc', criteria);
+            }
+            
+            // Move checkmark
+            $('.sort-icon').css('visibility', 'hidden');
+            $(this).find('.sort-icon').css('visibility', 'visible');
+        });
+
+        $('#desc').click(function(e) {
+            e.preventDefault();
+            currentSortOrder = 'desc';
+            
+            if (localStorage.getItem('calibre_tree_view') === 'true') {
+                rebuildTree();
+            } else {
+                var criteria = $(this).data('id') === 'rating' ? 'rating' : 'id';
+                sort_list('desc', criteria);
+            }
+            
+            // Move checkmark
+            $('.sort-icon').css('visibility', 'hidden');
+            $(this).find('.sort-icon').css('visibility', 'visible');
+        });
+        
+        $('#sort_name').click(function(e) { 
+             e.preventDefault(); 
+             location.reload(); 
+        });
+
+        // --- TREE VIEW LOGIC ---
+        {% if data == "category" %}
+        
+        var isTreeMode = localStorage.getItem('calibre_tree_view') === 'true';
+        var treeData = null;
+
+        function buildTreeData() {
+            var root = {};
+            
+            $('#list .list-item').each(function() {
+                var rawName = $(this).data('name-raw') || $(this).text().trim();
+                var count = parseInt($(this).data('count')) || 0;
+                var href = $(this).find('a').attr('href');
+                
+                var parts = rawName.split('.');
+                var current = root;
+                
+                parts.forEach(function(part, index) {
+                    if (!current[part]) {
+                        current[part] = {
+                            name: part,
+                            children: {},
+                            count: 0,
+                            isReal: false,
+                            href: null,
+                            totalCount: 0
+                        };
+                    }
+                    
+                    current[part].totalCount += count;
+                    
+                    if (index === parts.length - 1) {
+                        current[part].isReal = true;
+                        current[part].href = href;
+                        current[part].count = count;
+                    }
+                    
+                    current = current[part].children;
+                });
+            });
+            return root;
+        }
+
+        function renderTree(nodeDict) {
+            var html = '';
+            var keys = Object.keys(nodeDict).sort(function(a, b) {
+                if (currentSortOrder === 'desc') {
+                    return b.toLowerCase().localeCompare(a.toLowerCase());
+                } else {
+                    return a.toLowerCase().localeCompare(b.toLowerCase());
+                }
+            });
+
+            keys.forEach(function(key) {
+                var node = nodeDict[key];
+                var hasChildren = Object.keys(node.children).length > 0;
+                
+                var tooltipAttrs = "";
+                if (hasChildren) {
+                    var tooltipText = "";
+                    if (node.isReal) {
+                        tooltipText = node.count + " direct";
+                        if (node.totalCount > node.count) {
+                            tooltipText += ", " + (node.totalCount - node.count) + " in sub-categories";
+                        }
+                    } else {
+                        tooltipText = node.totalCount + " total in sub-categories";
+                    }
+                    tooltipAttrs = 'title="' + tooltipText + '" data-toggle="tooltip" data-animation="false" data-delay="0" data-placement="auto right" data-container="body"';
+                }
+                
+                html += '<div class="tree-node">';
+                html += '<div class="tree-content" ' + tooltipAttrs + '>';
+                
+                if (hasChildren) {
+                    html += '<span class="tree-caret glyphicon glyphicon-chevron-right"></span>';
+                } else {
+                    html += '<span class="tree-caret empty"></span>';
+                }
+                
+                if (node.isReal) {
+                    html += '<a href="' + node.href + '" class="tree-link">' + node.name + '</a>';
+                    html += '<span class="badge">' + node.totalCount + '</span>';
+                } else {
+                    html += '<span class="tree-link virtual">' + node.name + '</span>';
+                    html += '<span class="badge" style="opacity:0.6;">' + node.totalCount + '</span>';
+                }
+                
+                html += '</div>';
+                
+                if (hasChildren) {
+                    html += '<div class="tree-children">';
+                    html += renderTree(node.children);
+                    html += '</div>';
+                }
+                
+                html += '</div>';
+            });
+            return html;
+        }
+
+        function rebuildTree() {
+            if (!treeData) treeData = buildTreeData();
+            var html = renderTree(treeData);
+            $('#tree-view').html(html);
+            
+            $('#tree-view [data-toggle="tooltip"]').tooltip({
+                delay: { "show": 0, "hide": 0 },
+                animation: false
+            });
+            
+            $('.tree-content').click(function(e) {
+                if ($(e.target).is('a')) return;
+                var $children = $(this).next('.tree-children');
+                var $caret = $(this).find('.tree-caret');
+                if ($children.length) {
+                    $children.slideToggle(150);
+                    $caret.toggleClass('expanded');
+                }
+            });
+        }
+
+        function toggleView() {
+            if (isTreeMode) {
+                rebuildTree();
+                $('#list').hide();
+                $('.filterheader').hide(); 
+                $('#tree-view').fadeIn();
+                $('#tree-check').removeClass('glyphicon-unchecked').addClass('glyphicon-check');
+            } else {
+                $('#tree-view').hide();
+                $('#list').show();
+                $('.filterheader').show();
+                $('#tree-check').removeClass('glyphicon-check').addClass('glyphicon-unchecked');
+            }
+            if (isTreeMode) {
+                document.documentElement.classList.add('is-tree-view');
+            } else {
+                document.documentElement.classList.remove('is-tree-view');
+            }
+            localStorage.setItem('calibre_tree_view', isTreeMode);
+        }
+
+        $('#tree-button').click(function(e) {
+            e.preventDefault();
+            isTreeMode = !isTreeMode;
+            toggleView();
+        });
+
+        if (isTreeMode) {
+            rebuildTree();
+            $('#tree-check').removeClass('glyphicon-unchecked').addClass('glyphicon-check');
+        }
+        
+        {% endif %}
+        // --- TRIGGER LOADING OVERLAY ON CATEGORY/LIST CLICKS ---
+        $(document).on('click', '.list-item a, .tree-link:not(.virtual)', function() {
+            // Grab the name of the clicked item
+            var itemName = $(this).text().trim();
+            
+            // Update the text and show the global overlay
+            $('#pagination-loading-text').text("{{ _('Loading') }} " + itemName + "...");
+            $('#pagination-loading-overlay').css('display', 'flex');
+        });
+    });
+</script>
+{% endblock %}

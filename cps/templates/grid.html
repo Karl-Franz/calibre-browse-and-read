@@ -1,0 +1,192 @@
+{% import 'image.html' as image %}
+{% extends "layout.html" %}
+{% block body %}
+
+<div class="sticky-header">
+    <div class="header-top">
+        
+        <div class="dropdown">
+            <div class="gear-btn dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <span class="glyphicon glyphicon-cog"></span>
+            </div>
+            <ul class="dropdown-menu">
+                <li class="dropdown-header">{{_('Sort & View')}}</li>
+                
+                <li {% if order != 'desc' %}class="active"{% endif %}>
+                    <a href="#" id="asc" data-id="series" data-order="{{ order }}">
+                        <span class="glyphicon glyphicon-sort-by-alphabet"></span> {{_('Sort A-Z')}}
+                    </a>
+                </li>
+                
+                <li {% if order == 'desc' %}class="active"{% endif %}>
+                    <a href="#" id="desc" data-id="series">
+                        <span class="glyphicon glyphicon-sort-by-alphabet-alt"></span> {{_('Sort Z-A')}}
+                    </a>
+                </li>
+
+                <li class="divider"></li>
+                <li>
+                    <a href="#" class="update-view" data-target="series_view" id="list-button" data-view="list">
+                        <span class="glyphicon glyphicon-list"></span> {{_('Toggle List View')}}
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <h2>{{_(title)}}</h2>
+    </div>
+
+    <div class="header-bottom filterheader">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      
+      <div class="btn-group character" role="group" style="display: flex; flex-wrap: wrap; margin-top: 5px;">
+        {% if charlist|length %}
+        <div id="all" class="btn btn-default btn-xs active" style="margin: 2px;">{{_('All')}}</div>
+        {% endif %}
+        {% for char in charlist%}
+        <div class="btn btn-default btn-xs char" style="margin: 2px;">{{char.char}}</div>
+        {% endfor %}
+      </div>
+    </div>
+</div>
+
+<div class="browse-books">
+    {% if entries[0] %}
+        <div id="list" class="row display-flex" style="margin-left: 0; margin-right: 0;">
+          {% for entry in entries %}
+              
+              <div class="col-sm-3 col-lg-2 col-xs-6 book sortable {% if entry.count > 1 %}is-stack{% endif %}" {% if entry[0].sort %}data-name="{{entry[0].series[0].name}}"{% endif %} data-id="{% if entry[0].series[0].name %}{{entry[0].series[0].name}}{% endif %}" style="padding-left: 10px; padding-right: 10px;">
+                  <div class="cover">
+                      {% if entry.count == 1 %}
+                      <a href="{{url_for('web.show_book', book_id=entry[0].id )}}" data-toggle="modal" data-target="#bookDetailsModal" data-remote="false">
+                      {% else %}
+                      <a href="{{url_for('web.books_list', data=data, sort_param='stored', book_id=entry[0].series[0].id )}}">
+                      {% endif %}
+                          <span class="img" title="{{entry[0].series[0].name}}">
+                              {{ image.book_cover(entry[0])}}
+                              
+                              {% if entry.count > 1 %}
+                                  <div class="stack-badge" style="position:absolute; top:-8px; right:-8px; background:#337ab7; color:#fff; font-size:12px; padding:3px 7px; border-radius:12px; font-weight:bold; z-index:20;">
+                                      <span class="glyphicon glyphicon-book" style="margin-right:4px;"></span>{{ entry.count }}
+                                  </div>
+                              {% endif %}
+                              
+                            </span>
+                      </a>
+                  </div>
+                  <div class="meta">
+                      {% if entry.count == 1 %}
+                      <a href="{{url_for('web.show_book', book_id=entry[0].id )}}" data-toggle="modal" data-target="#bookDetailsModal" data-remote="false">
+                      {% else %}
+                      <a href="{{url_for('web.books_list', data=data, sort_param='stored', book_id=entry[0].series[0].id )}}">
+                      {% endif %}
+                          <p title="{{entry[0].series[0].name|shortentitle}}" class="title">{{entry[0].series[0].name|shortentitle}}</p>
+                      </a>
+                  </div>
+              </div>
+        {% endfor %}
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    /* --- UNIFORM COVER SIZING --- */
+    .book .cover {
+        margin-bottom: 12px !important; 
+        position: relative !important;
+    }
+    
+    .book .cover .img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 2 / 2.8; 
+        background-color: #f4f4f4; 
+        border-radius: 4px;
+        position: relative;
+        z-index: 1; 
+    }
+    
+    .book .cover .img img {
+        display: block; 
+        width: 100%;
+        height: 100%;
+        border-radius: inherit;
+        object-fit: fill; 
+    }
+
+    /* --- FLAT CSS STACK EFFECT --- */
+    .book.is-stack .img {
+        border: none; 
+        margin-bottom: 8px; 
+        margin-right: 8px;
+        box-shadow:
+            4px 4px 0 0px #cccccc,
+            8px 8px 0 0px #e6e6e6;
+    }
+    
+    /* ADDED MARGIN-BOTTOM FOR ROW SPACING */
+    .book { 
+        cursor: pointer; 
+        margin-bottom: 25px; 
+    }
+
+    /* --- ENLARGE GEAR ICON TOUCH AREA FOR IPAD --- */
+    .gear-btn {
+        padding: 15px 20px !important;  
+        margin: -10px -15px !important; 
+        cursor: pointer;
+        display: inline-block;
+    }
+    
+    .gear-btn .glyphicon-cog {
+        font-size: 22px !important;     
+        vertical-align: middle;
+        color: #555;                    
+    }
+
+    body {
+        overflow-y: hidden !important;
+    }
+    @media (min-width: 768px) {
+        .browse-books {
+            margin-top: 140px !important; 
+            height: calc(100vh - 190px) !important;
+        }
+    }
+</style>
+
+{% endblock %}
+
+{% block js %}
+<script src="{{ url_for('static', filename='js/filter_grid.js') }}"></script>
+<script>
+    $(document).ready(function() {
+        
+        // 1. Click Handler (Instant Feedback)
+        $('#asc, #desc').click(function() {
+            $(this).closest('.dropdown-menu').find('li').removeClass('active');
+            $(this).parent().addClass('active');
+        });
+
+        // 2. State Correction on Load
+        // The server might send Z-A content but forget to set the 'active' flag.
+        // We check the actual DOM content to confirm the sort order.
+        var $books = $('.book');
+        if ($books.length > 1) {
+            var firstTitle = $books.first().find('.meta .title').text().trim().toLowerCase();
+            var lastTitle = $books.last().find('.meta .title').text().trim().toLowerCase();
+            
+            // Compare strings: if First > Last, it is Descending (Z-A)
+            if (firstTitle.localeCompare(lastTitle) > 0) {
+                // Force Z-A Highlight
+                $('#asc').parent().removeClass('active');
+                $('#desc').parent().addClass('active');
+            } else {
+                // Force A-Z Highlight (Optional, as it is default)
+                $('#desc').parent().removeClass('active');
+                $('#asc').parent().addClass('active');
+            }
+        }
+    });
+</script>
+{% endblock %}

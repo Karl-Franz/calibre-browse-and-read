@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html class="no-js">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>{{_('txt Reader')}} | {{title}}</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, user-scalable=no">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        {% if g.google_site_verification|length > 0 %}
+          <meta name="google-site-verification" content="{{g.google_site_verification}}">
+        {% endif %}  
+
+        <link rel="apple-touch-icon" sizes="140x140" href="{{ url_for('static', filename='favicon.ico') }}">
+        <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" type="text/css"/>
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/text.css') }}" type="text/css"/>
+
+        <script src="{{ url_for('static', filename='js/libs/jquery.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/libs/plugins.js') }}"></script>
+        <script>
+            "use strict";
+        </script>
+        <script src="{{ url_for('static', filename='js/reading/txt_reader.js') }}"></script>
+    </head>
+    <body>
+      <a id="exit" 
+        href="{{ url_for('web.show_book', book_id=txtfile) }}" 
+        onclick="window.close();" 
+        style="position: fixed; top: 15px; right: 15px; z-index: 1000; background: rgba(0,0,0,0.5); color: #fff; padding: 8px 12px; border-radius: 4px; text-decoration: none; font-family: sans-serif; cursor: pointer;">
+          {{_('Close')}}
+      </a>
+
+      <div id="readmain" data-load="{{ url_for('web.serve_book', book_id=txtfile, book_format='txt') }}">
+        <div id="left" class="arrow" >‹</div>
+        <div id="area"><pre id="content" class="content"></pre></div>
+        <div id="right" class="arrow">›</div>
+      </div>
+    </body>
+</html>

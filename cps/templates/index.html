@@ -1,0 +1,931 @@
+{% import 'image.html' as image %}
+{% extends "layout.html" %}
+{% block body %}
+
+{% set wishlist_ns = namespace(id=None) %}
+{% if current_user.is_authenticated %}
+    {% for shelf in g.shelves_access %}
+        {% if "wishlist" in shelf.name|string|lower %}
+            {% set wishlist_ns.id = shelf.id %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
+{% set wishlist_id = wishlist_ns.id %}
+
+<div class="sticky-header {% if pagination and (pagination.has_next or pagination.has_prev) %}has-pagination{% endif %}">
+    <div class="header-top">
+      {% if page != 'discover' %}
+      <div class="dropdown">
+        <div class="gear-btn dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <span class="glyphicon glyphicon-cog"></span>
+        </div>
+        <ul class="dropdown-menu">
+            
+            {% if page == 'currently_reading' %}
+                <li class="dropdown-header">{{_('Manage')}}</li>
+                <li><a href="#" id="menu-bulk-edit-cr">
+                    <span class="glyphicon glyphicon-check" style="margin-right: 5px; color: #5cb85c;"></span> {{_('Bulk Edit')}}
+                </a></li>
+            {% else %}
+                <li class="dropdown-header">{{_('Sort By')}}</li>
+                
+                {% if page == 'hot' %}
+                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='hotasc')}}">
+                      <span class="glyphicon glyphicon-ok" {% if order != 'hotasc' %}style="visibility:hidden;"{% endif %}></span> {{_('Downloads (Low to High)')}}
+                  </a></li>
+                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='hotdesc')}}">
+                      <span class="glyphicon glyphicon-ok" {% if order != 'hotdesc' %}style="visibility:hidden;"{% endif %}></span> {{_('Downloads (High to Low)')}}
+                  </a></li>
+                {% else %}
+                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='new')}}">
+                      <span class="glyphicon glyphicon-ok" {% if order != 'new' and order != 'stored' %}style="visibility:hidden;"{% endif %}></span> {{_('Date Added (Newest)')}}
+                  </a></li>
+                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='old')}}">
+                      <span class="glyphicon glyphicon-ok" {% if order != 'old' %}style="visibility:hidden;"{% endif %}></span> {{_('Date Added (Oldest)')}}
+                  </a></li>
+                  <li class="divider"></li>
+                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='abc')}}">
+                      <span class="glyphicon glyphicon-ok" {% if order != 'abc' %}style="visibility:hidden;"{% endif %}></span> {{_('Title (A-Z)')}}
+                  </a></li>
+                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='zyx')}}">
+                      <span class="glyphicon glyphicon-ok" {% if order != 'zyx' %}style="visibility:hidden;"{% endif %}></span> {{_('Title (Z-A)')}}
+                  </a></li>
+                  <li class="divider"></li>
+                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='authaz')}}">
+                      <span class="glyphicon glyphicon-ok" {% if order != 'authaz' %}style="visibility:hidden;"{% endif %}></span> {{_('Author (A-Z)')}}
+                  </a></li>
+                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='authza')}}">
+                      <span class="glyphicon glyphicon-ok" {% if order != 'authza' %}style="visibility:hidden;"{% endif %}></span> {{_('Author (Z-A)')}}
+                  </a></li>
+                  <li class="divider"></li>
+                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='pubnew')}}">
+                      <span class="glyphicon glyphicon-ok" {% if order != 'pubnew' %}style="visibility:hidden;"{% endif %}></span> {{_('Pub Date (Newest)')}}
+                  </a></li>
+                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='pubold')}}">
+                      <span class="glyphicon glyphicon-ok" {% if order != 'pubold' %}style="visibility:hidden;"{% endif %}></span> {{_('Pub Date (Oldest)')}}
+                  </a></li>
+                  {% if page == 'series' %}
+                  <li class="divider"></li>
+                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='seriesasc')}}">
+                      <span class="glyphicon glyphicon-ok" {% if order != 'seriesasc' %}style="visibility:hidden;"{% endif %}></span> {{_('Series Index (1-9)')}}
+                  </a></li>
+                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='seriesdesc')}}">
+                      <span class="glyphicon glyphicon-ok" {% if order != 'seriesdesc' %}style="visibility:hidden;"{% endif %}></span> {{_('Series Index (9-1)')}}
+                  </a></li>
+                  {% endif %}
+                {% endif %}
+                
+                {% if page not in ['series', 'hot', 'boxsets', 'ratings', 'user_ratings'] %}
+                <li class="divider"></li>
+                <li class="dropdown-header">{{_('View Modifiers')}}</li>
+                <li>
+                    <a href="#" id="toggle-user-ratings">
+                        <span class="glyphicon glyphicon-{% if request.cookies.get('cw_show_user_ratings', '1') == '1' %}check{% else %}unchecked{% endif %}"></span> {{_('Show User Ratings')}}
+                    </a>
+                </li>
+                <li>
+                    <a href="#" id="toggle-series-first">
+                        <span class="glyphicon glyphicon-{% if request.cookies.get('cw_series_first') == '1' %}check{% else %}unchecked{% endif %}"></span> {{_('Series First')}}
+                    </a>
+                </li>
+                <li>
+                    <a href="#" id="toggle-stack-series">
+                        <span class="glyphicon glyphicon-{% if request.cookies.get('cw_stack_series', '1') == '1' %}check{% else %}unchecked{% endif %}"></span> {{_('Stack Series')}}
+                    </a>
+                </li>
+                {% endif %}
+            {% endif %}
+        </ul>
+      </div>
+      {% endif %}
+      <h2>
+        {% if entries|length < 1 %}
+            {{_('No Results Found')}} <small>{{_('Search Term:')}} {{adv_searchterm}}</small>
+        {% else %}
+            {% if page == 'category' %}
+                {{title.replace('.', '<span class="glyphicon glyphicon-chevron-right" style="font-size: 0.6em; margin: 0 4px; vertical-align: middle; position: relative; top: -1px;"></span>')|safe}}
+            {% else %}
+                {{title}}
+            {% endif %}
+            
+            <small>
+                {% if pagination %}
+                    {% set start_idx = (pagination.page - 1) * pagination.per_page + 1 %}
+                    {% set end_idx = start_idx + entries|length - 1 %}
+                    [{{_('Books')}} {{ start_idx }} {{_('-')}} {{ end_idx }} {{_('out of')}} {{ pagination.total_count }}]
+                {% else %}
+                    [{{ result_count }}]
+                {% endif %}
+            </small>
+        {% endif %}
+      </h2>
+    </div>
+
+    <div class="header-bottom">
+       {% if pagination and (pagination.has_next or pagination.has_prev) %}
+           <div class="pagination" data-per-page="{{ pagination.per_page }}" data-total="{{ pagination.total_count }}" style="display: block; text-align: left; margin-top: 5px; margin-bottom: 0px;">
+             {% if pagination.has_prev %}
+             <li class="page-item page-previous" style="display: inline-block;"><a class="page-link" aria-label="next page" href="{{ (pagination.page - 1)|url_for_other_page }}">&laquo; {{_('Previous')}}</a></li>
+             {% endif %}
+           {% for page in pagination.iter_pages() %}
+             {% if page %}
+               {% if page != pagination.page %}
+                 <li class="page-item" style="display: inline-block;"><a class="page-link" aria-label="to page {{ page }}" href="{{ (page)|url_for_other_page }}">{{ page }}</a></li>
+               {% else %}
+                 <li class="page-item active" style="display: inline-block;"><a class="page-link" aria-label="to page {{ page }}" href="{{ (page)|url_for_other_page }}">{{ page }}</a></li>
+               {% endif %}
+             {% else %}
+               <li class="page-item page-last-separator disabled" style="display: inline-block;"><a class="page-link" aria-label="">…</a></li>
+             {% endif %}
+           {% endfor %}
+           {% if pagination.has_next %}
+             <li class="page-item page-next" style="display: inline-block;"><a class="page-link next" aria-label="next page" href="{{ (pagination.page + 1)|url_for_other_page }}">{{_('Next')}} &raquo;</a></li>
+           {% endif %}
+           </div>
+       {% endif %}
+    </div>
+</div>
+
+{% if page == 'currently_reading' %}
+<div id="bulk-action-bar">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-3 col-xs-12 text-center" style="margin-bottom: 5px;">
+                <button class="btn btn-default btn-sm" id="bulk-select-all">{{ _('Select All') }}</button>
+                <button class="btn btn-default btn-sm" id="bulk-select-none">{{ _('None') }}</button>
+                <span style="margin-left:10px;">Selected: <b id="selection-count">0</b></span>
+            </div>
+            
+            <div class="col-md-6 col-xs-12 text-center" style="margin-bottom: 5px;">
+                <form class="form-inline" style="display: inline-block;">
+                    <div class="btn-group dropup">
+                        <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            <span id="bulk-target-label">-- {{ _('Select Target Shelf') }} --</span> <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu" id="bulk-target-list">
+                            {% if current_user.is_authenticated %}
+                                {% for s in g.shelves_access %}
+                                    {% if "wishlist" not in s.name|string|lower %}
+                                        <li><a href="#" data-value="{{ s.id }}">{{ s.name }}</a></li>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </ul>
+                    </div>
+                    <input type="hidden" id="bulk-target-shelf" value="">
+
+                    <button type="button" class="btn btn-info btn-sm" id="btn-copy" disabled>{{ _('Copy') }}</button>
+                    <button type="button" class="btn btn-warning btn-sm" id="btn-move" disabled>{{ _('Move') }}</button>
+                    
+                    {% if wishlist_id %}
+                        <button type="button" class="btn btn-success btn-sm" id="btn-bulk-wishlist" style="margin-left: 10px;">
+                            <span class="glyphicon glyphicon-heart"></span> {{ _('Wishlist') }}
+                        </button>
+                    {% endif %}
+                </form>
+            </div>
+
+            <div class="col-md-3 col-xs-12 text-center">
+                <button type="button" class="btn btn-danger btn-sm" id="btn-remove">{{ _('Remove from CR') }}</button>
+                <button type="button" class="btn btn-default btn-sm" id="btn-cancel-bulk" style="margin-left: 10px;">{{ _('Cancel') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="bulk-process-overlay">
+    <div class="processing-box">
+        <h3>{{ _('Processing...') }}</h3>
+        <p>{{ _('Please wait while we update your books.') }}</p>
+        <div class="progress">
+          <div id="bulk-progress-bar" class="progress-bar progress-bar-striped active" role="progressbar" style="width: 0%"></div>
+        </div>
+        <p id="bulk-status-text">0 / 0</p>
+    </div>
+</div>
+{% endif %}
+
+<div class="browse-books">
+
+    {% if currently_reading %}
+    <div class="currently-reading-section" style="padding: 15px 15px 5px; margin-bottom: 15px; background: rgba(0,0,0,0.03); border-radius: 8px; height: fit-content;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2 style="margin: 0; font-size: 20px; font-weight: bold; color: #444;">
+                <span class="glyphicon glyphicon-book" style="margin-right: 8px; color: #007bff;"></span>{{_('Currently Reading')}}
+            </h2>
+            <button id="btn-edit-cr" class="btn btn-sm btn-default" style="border-radius: 20px; padding: 4px 15px;">{{_('Edit')}}</button>
+        </div>
+        
+        <div class="cr-scroller" style="display: flex; align-items: flex-start; overflow-x: auto; overflow-y: hidden; height: fit-content; gap: 15px; padding-bottom: 5px; scroll-behavior: smooth; -webkit-overflow-scrolling: touch;">
+            {% for book in currently_reading %}
+            
+        {% set is_read = false %}
+        {% set check_id = current_book_id if current_book_id is defined else (book.id if book is defined else 0) %}
+        {% if entry is defined and entry|length > 2 and entry[2] is defined and (entry[2] == True or entry[2] == 1) %}
+            {% set is_read = true %}
+        {% elif current_book is defined and current_book.read_status is defined and (current_book.read_status == 1 or current_book.read_status == True) %}
+            {% set is_read = true %}
+        {% elif book is defined and book.read_status is defined and (book.read_status == 1 or book.read_status == True) %}
+            {% set is_read = true %}
+        {% elif global_reading_progress is defined and global_reading_progress.get(check_id|int) == 100 %}
+            {% set is_read = true %}
+        {% endif %}
+            
+            <div class="cr-book book session" data-book-id="{{ book.id }}" style="flex: 0 0 130px; height: fit-content; margin-bottom: 0; cursor: pointer; position: relative; display: flex; flex-direction: column; justify-content: flex-start; gap: 6px;">
+                
+                <div class="cr-remove-btn" style="display: none; position: absolute; top: -8px; right: -8px; background: #d9534f; color: white; border-radius: 50%; width: 26px; height: 26px; text-align: center; line-height: 24px; font-size: 14px; z-index: 20; box-shadow: 0 2px 5px rgba(0,0,0,0.3); cursor: pointer;">
+                    <span class="glyphicon glyphicon-remove"></span>
+                </div>
+                
+                <div class="cover {% if is_read %}read-book-dimmed{% endif %}" style="margin: 0 !important; padding: 0 !important; line-height: 0;">
+                    <a href="{{ url_for('web.show_book', book_id=book.id) }}" style="display: block; margin: 0; padding: 0;" {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}>
+                        <span class="img" title="{{ book.title }}" style="display: block; margin: 0; padding: 0;">
+                            {{ image.book_cover(book) }}
+                            {% if book.id|int in global_wishlist_ids|default([]) %}
+                                <div class="wishlist-overlay"><span class="glyphicon glyphicon-heart"></span></div>
+                            {% endif %}
+                            {% if is_read %}
+                                <div class="read-overlay"><span class="glyphicon glyphicon-ok"></span> {{_('READ')}}</div>
+                            {% endif %}
+                            {% if request.cookies.get('cw_show_user_ratings', '1') == '1' %}
+                                {% set u_rating = global_user_ratings.get(check_id|int) %}
+                                {% if u_rating %}
+                                    <div class="user-rating-pill">
+                                        {% set stars = (u_rating / 2)|int %}
+                                        {% for i in range(stars) %}&#9733;{% endfor %}{% for i in range(5 - stars) %}<span class="star-dot">&#9679;</span>{% endfor %}
+                                    </div>
+                                {% endif %}
+                            {% endif %}
+                        </span>
+                    </a>
+                </div>
+                
+                <div style="height: 5px; background: #e0e0e0; border-radius: 3px; overflow: hidden; width: 100%; margin: 0;">
+                    <div style="height: 100%; background: #007bff; width: {{ book.reading_progress_pct }}%; border-radius: 3px;"></div>
+                </div>
+                
+                <div class="meta" style="margin: 0; text-align: left;">
+                    <a href="{{ url_for('web.show_book', book_id=book.id) }}" {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}>
+                        <p class="title" style="font-size: 13px; font-weight: 600; margin: 0; color: #333; line-height: 1.3; white-space: normal; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis;" title="{{ book.title }}">{{ book.title|shortentitle }}</p>
+                    </a>
+                    
+                    <p class="author" style="margin-top: 2px; margin-bottom: 0; font-size: 12px; line-height: 1.2;">
+                        {% for author in book.authors %}
+                            <a class="author-name" href="{{url_for('web.books_list', data='author', sort_param='stored', book_id=author.id) }}" style="color: #666;">{{ author.name.replace('|',',')|shortentitle(30) }}</a>{% if not loop.last %}<span>&amp;</span>{% endif %}
+                        {% endfor %}
+                    </p>
+                    
+                    {% if book.series|length > 0 %}
+                        <p class="series" style="display: none;">{{ book.series[0].name }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <hr style="margin: 20px 15px 25px 15px; border-top: 2px solid #e0e0e0; box-shadow: 0 1px 0 #fff;">
+    {% endif %}
+
+    {% if current_user.show_detail_random() and page not in ["discover", "currently_reading"] %}
+    <div class="discover random-books" style="padding-left: 0; margin-left: 0;">
+      <h2 class="random-books">{{_('Discover (Random Books)')}}</h2>
+      <div class="row display-flex" style="margin-left: 0; margin-right: 0;">
+       {% for entry in random %}
+        
+        {% set current_book_id = entry.Books.id if entry.Books else (entry[0].id if entry[0] else entry.id) %}
+        {% set current_book = entry.Books if entry.Books else (entry[0] if entry[0] else entry) %}
+        
+        {% set is_read = false %}
+        {% set check_id = current_book_id if current_book_id is defined else (book.id if book is defined else 0) %}
+        {% if entry is defined and entry|length > 2 and entry[2] is defined and (entry[2] == True or entry[2] == 1) %}
+            {% set is_read = true %}
+        {% elif current_book is defined and current_book.read_status is defined and (current_book.read_status == 1 or current_book.read_status == True) %}
+            {% set is_read = true %}
+        {% elif book is defined and book.read_status is defined and (book.read_status == 1 or book.read_status == True) %}
+            {% set is_read = true %}
+        {% elif global_reading_progress is defined and global_reading_progress.get(check_id|int) == 100 %}
+            {% set is_read = true %}
+        {% endif %}
+       
+        <div class="col-sm-3 col-lg-2 col-xs-6 book session" id="books_rand" style="padding-left: 10px; padding-right: 10px;">
+          <div class="cover {% if is_read %}read-book-dimmed{% endif %}" data-book-id="{{ current_book_id }}">
+              <a href="{{ url_for('web.show_book', book_id=current_book_id) }}" {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}>
+                  <span class="img" title="{{ current_book.title }}">
+                    {{ image.book_cover(current_book) }}
+                    
+                    {% if current_book_id|int in global_wishlist_ids|default([]) %}
+                        <div class="wishlist-overlay"><span class="glyphicon glyphicon-heart"></span></div>
+                    {% endif %}
+                    
+                    {% if is_read %}
+                        <div class="read-overlay"><span class="glyphicon glyphicon-ok"></span> {{_('READ')}}</div>
+                    {% endif %}
+                    {% if request.cookies.get('cw_show_user_ratings', '1') == '1' %}
+                        {% set u_rating = global_user_ratings.get(check_id|int) %}
+                        {% if u_rating %}
+                            <div class="user-rating-pill">
+                                {% set stars = (u_rating / 2)|int %}
+                                {% for i in range(stars) %}&#9733;{% endfor %}{% for i in range(5 - stars) %}<span class="star-dot">&#9679;</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                  </span>
+              </a>
+          </div>
+          
+          {% set prog = global_reading_progress.get(current_book_id|int) %}
+          {% if prog is not none %}
+                <div style="height: 5px; background: #e0e0e0; border-radius: 3px; margin-top: 8px; margin-bottom: -3px; overflow: hidden; width: 100%;">
+                    <div style="height: 100%; background: #007bff; width: {{ prog }}%; border-radius: 3px;"></div>
+                </div>
+          {% endif %}
+          
+          <div class="meta">
+            <a href="{{ url_for('web.show_book', book_id=current_book_id) }}" {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}>
+              <p title="{{current_book.title}}" class="title">{{current_book.title|shortentitle}}</p>
+            </a>
+            <p class="author">
+              {% for author in current_book.authors %}
+                <a class="author-name" href="{{url_for('web.books_list',  data='author', sort_param='stored', book_id=author.id) }}">{{author.name.replace('|',',')|shortentitle(30)}}</a>
+                {% if not loop.last %}<span>&amp;</span>{% endif %}
+              {% endfor %}
+            </p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="row display-flex" style="margin-left: 0; margin-right: 0;">
+        {% if entries[0] %}
+        {% for entry in entries %}
+        
+       {% set current_book_id = entry.Books.id if entry.Books else (entry[0].id if entry[0] else entry.id) %}
+       {% set current_book = entry.Books if entry.Books else (entry[0] if entry[0] else entry) %}
+       {% set disable_stack = (page in ['series', 'discover', 'boxsets', 'currently_reading']) %}
+       
+       {% set is_read = false %}
+        {% set check_id = current_book_id if current_book_id is defined else (book.id if book is defined else 0) %}
+        {% if entry is defined and entry|length > 2 and entry[2] is defined and (entry[2] == True or entry[2] == 1) %}
+            {% set is_read = true %}
+        {% elif current_book is defined and current_book.read_status is defined and (current_book.read_status == 1 or current_book.read_status == True) %}
+            {% set is_read = true %}
+        {% elif book is defined and book.read_status is defined and (book.read_status == 1 or book.read_status == True) %}
+            {% set is_read = true %}
+        {% elif global_reading_progress is defined and global_reading_progress.get(check_id|int) == 100 %}
+            {% set is_read = true %}
+        {% endif %}
+       
+       <div class="col-sm-3 col-lg-2 col-xs-6 book session" id="books" style="padding-left: 10px; padding-right: 10px;"
+             {% if request.cookies.get('cw_stack_series', '1') == '1' and not disable_stack and current_book.series|length > 0 %}
+                data-series-id="{{ current_book.series[0].id }}"
+                data-series-name="{{ current_book.series[0].name }}"
+                data-series-count="{{ current_book.series[0].books|length }}"
+             {% endif %}
+       >
+          <div class="cover {% if is_read %}read-book-dimmed{% endif %}" data-book-id="{{ current_book_id }}">
+              <a href="{{ url_for('web.show_book', book_id=current_book_id) }}" {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}>
+                <span class="img" title="{{ current_book.title }}">
+                  {{ image.book_cover(current_book) }}
+                  
+                  {% if current_book_id|int in global_wishlist_ids|default([]) %}
+                      <div class="wishlist-overlay"><span class="glyphicon glyphicon-heart"></span></div>
+                  {% endif %}
+                  
+                  {% if is_read %}
+                        <div class="read-overlay"><span class="glyphicon glyphicon-ok"></span> {{_('READ')}}</div>
+                  {% endif %}
+                  
+                  <div class="bulk-select-overlay">
+                      <span class="glyphicon glyphicon-ok-circle"></span>
+                  </div>
+                  {% if request.cookies.get('cw_show_user_ratings', '1') == '1' %}
+                        {% set u_rating = global_user_ratings.get(check_id|int) %}
+                        {% if u_rating %}
+                            <div class="user-rating-pill">
+                                {% set stars = (u_rating / 2)|int %}
+                                {% for i in range(stars) %}&#9733;{% endfor %}{% for i in range(5 - stars) %}<span class="star-dot">&#9679;</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </span>
+              </a>
+          </div>
+
+          {% set prog = global_reading_progress.get(current_book_id|int) %}
+          {% if prog is not none %}
+                <div style="height: 5px; background: #e0e0e0; border-radius: 3px; margin-top: 8px; margin-bottom: -3px; overflow: hidden; width: 100%;">
+                    <div style="height: 100%; background: #007bff; width: {{ prog }}%; border-radius: 3px;"></div>
+                </div>
+          {% endif %}
+          
+          <div class="meta">
+            <a href="{{ url_for('web.show_book', book_id=current_book_id) }}" {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}>
+              <p title="{{ current_book.title }}" class="title">{{current_book.title|shortentitle}}</p>
+            </a>
+            <p class="author">
+              {% for author in current_book.authors %}
+                <a class="author-name" href="{{url_for('web.books_list', data='author', book_id=author.id, sort_param='stored') }}">{{author.name.replace('|',',')|shortentitle(30)}}</a>
+                {% if not loop.last %}<span>&amp;</span>{% endif %}
+              {% endfor %}
+            </p>
+            {% if current_book.series.__len__() > 0 %}
+            <p class="series">
+              <a href="{{url_for('web.books_list', data='series', sort_param='stored', book_id=current_book.series[0].id )}}">
+                {{current_book.series[0].name}}
+              </a>
+              {% if current_book.series_index|float > 0 %}
+                  [{{current_book.series_index|formatfloat(2)}}]
+              {% endif %}
+            </p>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      {% endif %}
+      </div>
+</div>
+
+<style>
+    .cr-scroller::-webkit-scrollbar { display: none; }
+    .cr-scroller { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* FLEXBOX BLOWOUT FIX */
+    .cr-book.session { max-width: 130px; }
+
+    /* Main grid covers */
+    .book.session .cover {
+        margin-bottom: 12px !important; 
+        position: relative !important;
+        width: 100%;
+    }
+    
+    /* Currently Reading side-scroller covers */
+    .cr-book.session .cover {
+        margin-bottom: 2px !important;
+        position: relative !important;
+        width: 100%;
+        height: auto !important; /* <-- THIS KILLS THE 225px GLOBAL HEIGHT */
+        min-height: 0 !important;
+    }
+    
+    .book.session .cover .img, .cr-book.session .cover .img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 2 / 2.8; 
+        background-color: #f4f4f4; 
+        border-radius: 4px;
+        position: relative;
+        z-index: 1; 
+        overflow: hidden; 
+    }
+    
+    .book.session .cover .img img, .cr-book.session .cover .img img,
+    .book.session .cover .img picture, .cr-book.session .cover .img picture {
+        display: block; 
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        border-radius: inherit;
+        object-fit: cover; 
+    }
+
+    .book.session.is-stack .img, .cr-book.session.is-stack .img {
+        border: none; 
+        margin-bottom: 8px; 
+        margin-right: 8px;
+        box-shadow:
+            4px 4px 0 0px #cccccc,
+            8px 8px 0 0px #e6e6e6;
+    }
+
+    body { overflow-y: hidden !important; }
+    
+    .book.session, .cr-book.session { 
+        cursor: pointer; 
+        margin-bottom: 25px; 
+    }
+    
+    @media (min-width: 768px) {
+        .browse-books { margin-top: 85px !important; height: calc(100vh - 150px) !important; overflow-y: auto; }
+    }
+
+    .read-overlay {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.75);
+        color: #fff;
+        padding: 6px 10px;
+        border-radius: 4px;
+        border: 1px solid rgba(255,255,255,0.4);
+        font-weight: bold; font-size: 13px;
+        text-transform: uppercase;
+        pointer-events: none; z-index: 10;
+        white-space: nowrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .read-book-dimmed img { 
+        opacity: 0.6; 
+        filter: grayscale(100%); 
+        transition: filter 0.3s ease, opacity 0.3s ease; 
+    }
+    .read-book-dimmed:hover img { 
+        opacity: 1.0; 
+        filter: grayscale(0%); 
+    }
+
+    .wishlist-overlay {
+        position: absolute;
+        top: 6px; left: 6px;
+        width: 30px; height: 30px;
+        background: #fff;
+        border-radius: 50%;
+        border: 1px solid #ccc;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 15; 
+        pointer-events: none;
+    }
+    .wishlist-overlay .glyphicon { color: #d9534f; font-size: 17px; top: 1px; }
+
+    @media (max-width: 991px) {
+        #sidebar { width: 25% !important; float: left !important; display: block !important; padding-right: 10px !important; }
+        #sidebar + div, #sidebar + .col-sm-9 { width: 75% !important; float: left !important; display: block !important; }
+    }
+
+    .gear-btn {
+        padding: 15px 20px !important;  
+        margin: -10px -15px !important; 
+        cursor: pointer;
+        display: inline-block;
+    }
+    
+    .gear-btn .glyphicon-cog {
+        font-size: 22px !important;     
+        vertical-align: middle;
+        color: #555;                    
+    }
+   /* 1. Outrank style.css but leave a 12px gap at the top for the red X */
+    .container-fluid .cr-book.book.session {
+        margin-top: 12px !important; /* <-- Pushes the book down so the X doesn't clip */
+        margin-bottom: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+    }
+
+    /* 2. Cap the scroller, but add 15px to max-height to compensate for the top margin */
+    .cr-scroller {
+        height: auto !important;
+        max-height: 330px !important; /* Bumped up from 315px to fit the new top margin */
+        min-height: 0 !important;
+    }
+
+    /* BULK EDIT STYLES */
+    #bulk-action-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: #fff; padding: 10px; z-index: 2000; display: none; box-shadow: 0 -2px 10px rgba(0,0,0,0.3); }
+    #bulk-action-bar .dropdown-menu { top: auto; bottom: 100%; margin-bottom: 2px; }
+    .bulk-mode .sticky-header { background-color: #333 !important; color: #fff !important; border-bottom: 1px solid #555; }
+    .bulk-mode .sticky-header h2, .bulk-mode .sticky-header small { color: #fff !important; }
+    .bulk-mode .sticky-header .dropdown-toggle { color: #333 !important; background-color: #fff; border-color: #ccc; }
+    #bulk-process-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 3000; display: none; align-items: center; justify-content: center; flex-direction: column; color: #fff; }
+    .processing-box { width: 80%; max-width: 400px; text-align: center; }
+    .bulk-mode .book.session { cursor: crosshair; }
+    .bulk-mode .cover a { pointer-events: none; }
+    .bulk-mode .cover { transition: transform 0.2s; }
+    .bulk-mode .book.selected .cover { transform: scale(0.92); box-shadow: 0 0 0 4px #007bff; border-radius: 4px; }
+    .bulk-select-overlay { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; color: #007bff; text-shadow: 0 2px 4px rgba(255,255,255,0.8); z-index: 20; pointer-events: none; }
+    .book.selected .bulk-select-overlay { display: block; }
+
+    /* Hide the gear menu entirely while in Bulk Edit mode */
+    .bulk-mode .header-top .dropdown { display: none !important; }
+
+    /* USER RATING PILL */
+    .user-rating-pill {
+        position: absolute;
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.75);
+        color: #ffff00; /* Star color */
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        line-height: 1.2;
+        letter-spacing: 1px;
+        pointer-events: none;
+        z-index: 15;
+        white-space: nowrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    }
+    .user-rating-pill .star-dot { 
+        color: #888; 
+        font-size: 10px; 
+        vertical-align: middle; 
+        margin: 0 1px;
+        position: relative;
+        top: -1px; /* Nudges the dot up to perfectly align with the stars */
+    }
+</style>
+{% endblock %}
+
+{% block js %}
+<script src="{{ url_for('static', filename='js/details.js') }}"></script>
+<script src="{{ url_for('static', filename='js/fullscreen.js') }}"></script>
+
+<script>
+    $(document).ready(function() {
+        
+        // --- HORIZONTAL SHELF EDIT CONTROLS ---
+        $('#btn-edit-cr').on('click', function(e) {
+            e.preventDefault();
+            var $scroller = $('.cr-scroller');
+            $scroller.toggleClass('is-editing');
+            
+            if ($scroller.hasClass('is-editing')) {
+                $(this).text("{{_('Done')}}").removeClass('btn-default').addClass('btn-primary');
+                $scroller.find('.cr-remove-btn').fadeIn(200);
+                $scroller.find('a').css('pointer-events', 'none'); 
+            } else {
+                $(this).text("{{_('Edit')}}").removeClass('btn-primary').addClass('btn-default');
+                $scroller.find('.cr-remove-btn').fadeOut(200);
+                $scroller.find('a').css('pointer-events', 'auto');
+            }
+        });
+
+        // --- BULK EDIT CONTROLS (Currently Reading Page) ---
+        var isBulkMode = false;
+        var jsWishlistId = {{ wishlist_id|default('null', true) }};
+
+        $('#menu-bulk-edit-cr').click(function(e) {
+            e.preventDefault();
+            isBulkMode = true;
+            $('body').addClass('bulk-mode');
+            $('#bulk-action-bar').slideDown();
+            $('.cover a').each(function() {
+                var $a = $(this);
+                $a.data('orig-toggle', $a.attr('data-toggle'));
+                $a.data('orig-href', $a.attr('href'));
+                $a.removeAttr('data-toggle');
+                $a.attr('href', 'javascript:void(0);');
+            });
+        });
+
+        $('#btn-cancel-bulk').click(function() {
+            isBulkMode = false;
+            $('body').removeClass('bulk-mode');
+            $('#bulk-action-bar').slideUp();
+            $('.book.selected').removeClass('selected');
+            updateCount();
+            $('.cover a').each(function() {
+                var $a = $(this);
+                if ($a.data('orig-toggle')) $a.attr('data-toggle', $a.data('orig-toggle'));
+                if ($a.data('orig-href')) $a.attr('href', $a.data('orig-href'));
+            });
+        });
+
+        $(document).on('click', '.book.session', function(e) {
+            if (isBulkMode) {
+                e.preventDefault(); 
+                e.stopImmediatePropagation();
+                $(this).toggleClass('selected');
+                updateCount();
+            }
+        });
+
+        $('#bulk-select-all').click(function() { $('.book.session').addClass('selected'); updateCount(); });
+        $('#bulk-select-none').click(function() { $('.book.session').removeClass('selected'); updateCount(); });
+
+        function updateCount() { $('#selection-count').text($('.book.selected').length); }
+        
+        $('#bulk-target-list a').click(function(e) {
+            e.preventDefault();
+            $('#bulk-target-shelf').val($(this).data('value'));
+            $('#bulk-target-label').text($(this).text());
+            $('#btn-copy, #btn-move').prop('disabled', false);
+        });
+
+        function processQueue(queue, actionName) {
+            var total = queue.length;
+            var current = 0;
+            if (total === 0) { alert("{{ _('No books selected!') }}"); return; }
+            $('#bulk-process-overlay').css('display', 'flex');
+            
+            function next() {
+                if (current >= total) {
+                    location.reload();
+                    return;
+                }
+                var item = queue[current];
+                var progress = Math.round((current / total) * 100);
+                $('#bulk-progress-bar').css('width', progress + '%');
+                $('#bulk-status-text').text(actionName + ": " + (current + 1) + " / " + total);
+                
+                $.ajax({
+                    url: item.url,
+                    type: 'POST',
+                    data: { csrf_token: "{{ csrf_token() }}" },
+                    complete: function() {
+                        if (item.nextUrl) {
+                            $.ajax({
+                                url: item.nextUrl,
+                                type: 'POST',
+                                data: { csrf_token: "{{ csrf_token() }}" },
+                                complete: function() {
+                                    current++;
+                                    next();
+                                }
+                            });
+                        } else {
+                            current++;
+                            next();
+                        }
+                    }
+                });
+            }
+            next();
+        }
+
+        $('#btn-remove').click(function() {
+            if (!confirm("{{ _('Remove selected books from Currently Reading?') }}")) return;
+            var queue = [];
+            $('.book.selected').each(function() {
+                var bookId = $(this).find('.cover').data('book-id');
+                queue.push({ url: "{{ url_for('web.remove_currently_reading', book_id='999999') }}".replace('999999', bookId) });
+            });
+            processQueue(queue, "Removing");
+        });
+
+        $('#btn-copy').click(function() {
+            var targetId = $('#bulk-target-shelf').val();
+            var queue = [];
+            $('.book.selected').each(function() {
+                var bookId = $(this).find('.cover').data('book-id');
+                queue.push({ url: "{{ url_for('shelf.add_to_shelf', shelf_id='888888', book_id='999999') }}".replace('888888', targetId).replace('999999', bookId) });
+            });
+            processQueue(queue, "Copying");
+        });
+
+        $('#btn-move').click(function() {
+            var targetId = $('#bulk-target-shelf').val();
+            if (!confirm("{{ _('Move selected books to shelf and remove from Currently Reading?') }}")) return;
+            var queue = [];
+            $('.book.selected').each(function() {
+                var bookId = $(this).find('.cover').data('book-id');
+                queue.push({ 
+                    url: "{{ url_for('shelf.add_to_shelf', shelf_id='888888', book_id='999999') }}".replace('888888', targetId).replace('999999', bookId),
+                    nextUrl: "{{ url_for('web.remove_currently_reading', book_id='999999') }}".replace('999999', bookId)
+                });
+            });
+            processQueue(queue, "Moving");
+        });
+        
+        $('#btn-bulk-wishlist').click(function() {
+            if (!jsWishlistId) { alert("Wishlist not found."); return; }
+            var queue = [];
+            $('.book.selected').each(function() {
+                var bookId = $(this).find('.cover').data('book-id');
+                queue.push({ url: "{{ url_for('shelf.add_to_shelf', shelf_id='888888', book_id='999999') }}".replace('888888', jsWishlistId).replace('999999', bookId) });
+            });
+            processQueue(queue, "Adding to Wishlist");
+        });
+
+        // --- UNIVERSAL REMOVE CLICK BINDING ---
+        $('.cr-remove-btn').on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            var $bookDiv = $(this).closest('.session'); 
+            var bookId = $(this).data('book-id') || $bookDiv.data('book-id');
+            
+            $.post("{{ url_for('web.remove_currently_reading', book_id=0) }}".replace('0', bookId), {
+                csrf_token: "{{ csrf_token() }}"
+            }).done(function() {
+                $bookDiv.fadeOut(300, function() { 
+                    $(this).remove(); 
+                    if ($('.cr-book').length === 0) {
+                        $('.currently-reading-section').fadeOut(300);
+                    }
+                });
+            });
+        });
+
+
+        function setCookie(name, value, days) {
+            var expires = "";
+            if (days) {
+                var date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+        }
+
+        function getCookie(name) {
+            var nameEQ = name + "=";
+            var ca = document.cookie.split(';');
+            for(var i=0; i < ca.length; i++) {
+                var c = ca[i];
+                while (c.charAt(0)==' ') c = c.substring(1,c.length);
+                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+            }
+            return null;
+        }
+
+        $('#toggle-series-first').click(function(e) {
+            e.preventDefault();
+            var current = getCookie('cw_series_first');
+            setCookie('cw_series_first', current === '1' ? '0' : '1', 365);
+            window.location.reload();
+        });
+
+        $('#toggle-stack-series').click(function(e) {
+            e.preventDefault();
+            var current = getCookie('cw_stack_series');
+            var nextState = (current === null || current === '1') ? '0' : '1';
+            setCookie('cw_stack_series', nextState, 365);
+            window.location.reload();
+        });
+
+        $('#toggle-user-ratings').click(function(e) {
+            e.preventDefault();
+            var current = getCookie('cw_show_user_ratings');
+            var nextState = (current === null || current === '1') ? '0' : '1';
+            setCookie('cw_show_user_ratings', nextState, 365);
+            window.location.reload();
+        });
+
+        // Disabled ONLY on specific pages like ratings, but active everywhere else
+        var isStackMode = {{ 'true' if request.cookies.get('cw_stack_series', '1') == '1' and page not in ['series', 'discover', 'boxsets', 'currently_reading', 'ratings', 'user_ratings'] else 'false' }};
+        
+        if (isStackMode) {
+            $('.book.session').each(function() {
+                if ($(this).hasClass('cr-book')) return;
+
+                var $book = $(this);
+                var seriesId = $book.data('series-id');
+                
+                if (seriesId) {
+                    var seriesCount = parseInt($book.data('series-count')) || 1;
+                    if (seriesCount > 1) {
+                        var seriesName = $book.data('series-name');
+                        $book.addClass('is-stack');
+                        var $cover = $book.find('.cover');
+                        $cover.append('<div class="stack-badge" style="position:absolute; top:-8px; right:-8px; background:#337ab7; color:#fff; font-size:12px; padding:3px 7px; border-radius:12px; font-weight:bold; z-index:20;"><span class="glyphicon glyphicon-book" style="margin-right:4px;"></span>' + seriesCount + '</div>');
+                        var seriesUrl = "{{ url_for('web.books_list', data='series', sort_param='stored', book_id='999999') }}".replace('999999', seriesId);
+                        $cover.find('a').attr('href', seriesUrl).removeAttr('data-toggle').removeAttr('data-target');
+                        $book.find('.meta a').first().attr('href', seriesUrl).removeAttr('data-toggle').removeAttr('data-target');
+                        $book.find('.meta .title').text(seriesName + " (Series)");
+                        $book.find('.meta .series').hide();
+                    }
+                }
+            });
+        }
+        
+        $(document).on('click', '.book.session, .cr-book.session', function(e) {
+            if ($(e.target).closest('a').length === 0) {
+                if (!$(e.target).closest('.cr-scroller').hasClass('is-editing') && !$(e.target).closest('.row').hasClass('is-editing-grid')) {
+                    $(this).find('.cover a').trigger('click');
+                }
+            }
+        });
+
+        $('.page-link').click(function(e) {
+            var $pagination = $(this).closest('.pagination');
+            if ($pagination.length === 0) return; 
+
+            var perPage = parseInt($pagination.data('per-page')) || 20;
+            var total = parseInt($pagination.data('total')) || 0;
+            var $activeItem = $pagination.find('.page-item.active');
+            var currentPage = 1;
+            if ($activeItem.length) {
+                currentPage = parseInt($activeItem.text());
+            }
+            
+            var targetPage = currentPage;
+            var $parent = $(this).parent(); 
+            
+            if ($parent.hasClass('page-next') || $(this).hasClass('next')) {
+                targetPage = currentPage + 1;
+            } else if ($parent.hasClass('page-previous') || $(this).hasClass('previous')) {
+                targetPage = currentPage - 1;
+            } else {
+                var textVal = parseInt($(this).text());
+                if (!isNaN(textVal)) { targetPage = textVal; }
+            }
+            
+            if (targetPage < 1) targetPage = 1;
+            var startIdx = (targetPage - 1) * perPage + 1;
+            var endIdx = Math.min(startIdx + perPage - 1, total);
+            
+            if (total > 0) {
+                $('#pagination-loading-text').text("{{ _('Retrieving Page') }} " + targetPage + ": {{ _('Books') }} " + startIdx + " - " + endIdx);
+            } else {
+                $('#pagination-loading-text').text("{{ _('Retrieving books...') }}");
+            }
+            $('#pagination-loading-overlay').css('display', 'flex');
+        });
+    });
+</script>
+{% endblock %}
