@@ -426,7 +426,6 @@ class Books(Base):
     path = Column(String, default="", nullable=False)
     has_cover = Column(Integer, default=0)
     uuid = Column(String)
-    uuid = Column(String)
     
     # --- NEW CALIBRE V9 PAGES LINK ---
     pages_link = relationship('BooksPagesLink', backref='book_obj', uselist=False)
@@ -437,8 +436,6 @@ class Books(Base):
             return self.pages_link.pages
         return None
     # ---------------------------------
-    #isbn = Column(String(collation='NOCASE'), default="") >>>> REMOVED for Calibre v9.x
-    #flags = Column(Integer, nullable=False, default=1)    >>>> REMOVED for Calibre v9.x
 
     authors = relationship(Authors, secondary=books_authors_link, backref='books')
     tags = relationship(Tags, secondary=books_tags_link, backref='books', order_by="Tags.name")
