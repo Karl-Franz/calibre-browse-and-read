@@ -35,3 +35,22 @@ gdrive_credentials
 client_secrets.json
 gmail.json
 /.key
+
+# --- Calibre-Web Tablet Edition Exclusions ---
+
+# Personal Database Files
+app.db
+metadata.db
+
+# Server Logs
+calibre-web.log
+access.log
+
+# macOS System Files
+.DS_Store
+**/.DS_Store
+
+# Virtual Environments (Just in case)
+.venv/
+venv/
+env/
