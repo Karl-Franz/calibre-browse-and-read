@@ -601,8 +601,8 @@ def update_view_configuration():
         config.config_default_show |= constants.DETAIL_RANDOM
 
     config.save()
-    flash(_("Calibre-Web configuration updated"), category="success")
-    log.debug("Calibre-Web configuration updated")
+    flash(_("Configuration updated"), category="success")
+    log.debug("Configuration updated")
     before_request()
 
     return view_configuration()

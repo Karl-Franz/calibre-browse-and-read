@@ -40,8 +40,8 @@
             border-top: 2px solid #ccc !important;
             box-shadow: none !important;
         }
-        /* --- NATIVE SYSTEM DARK MODE --- */
-        @media (prefers-color-scheme: dark) {
+        /* --- TABLET EDITION DARK MODE --- */
+        html.tablet-dark {
             /* 1. Master Backgrounds (Nuclear Specificity) */
             html, body, body div.col-sm-2:has(nav.navigation), body .navbar, 
             body .container-fluid, body .row-fluid, body .row, body .col-sm-2, 
@@ -449,13 +449,20 @@
             border-bottom: 2px solid #000000 !important;
         }
     </style>
-
-    {% if g.current_theme == 1 %}
-       <link href="{{ url_for('static', filename='css/caliBlur.css') }}" rel="stylesheet" media="screen">
-       <link href="{{ url_for('static', filename='css/caliBlur_override.css') }}" rel="stylesheet" media="screen">
-    {% endif %}
+    <script>
+        // Calibre-Web Tablet Edition: Dynamic Theme Router
+        (function() {
+            var themeMode = "{{ g.current_theme | default(2) }}"; 
+            var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            // If Admin chose Dark (1), OR Admin chose Auto (2) and the OS is Dark
+            if (themeMode === "1" || (themeMode === "2" && prefersDark)) {
+                document.documentElement.classList.add("tablet-dark");
+            }
+        })();
+    </script>
   </head>
-  <body class="{{ page }} {{ bodyClass }}{% if g.current_theme == 1 %} blur{% endif %} {% if request.cookies.get('cw_eink_mode') == '1' %}eink-mode{% endif %}" data-text="{{_('Home')}}" data-textback="{{_('Back')}}">
+  <body class="{{ page }} {{ bodyClass }} {% if request.cookies.get('cw_eink_mode') == '1' %}eink-mode{% endif %}" data-text="{{_('Home')}}" data-textback="{{_('Back')}}">
     
     {% set wishlist_shelf = namespace(id=None) %}
     {% if current_user.is_authenticated %}
@@ -494,15 +501,16 @@
         {% endif %}
         <div class="navbar-collapse collapse">
           {% if current_user.is_authenticated or g.allow_anonymous %}
-          <ul class="nav navbar-nav ">
+          <ul class="nav navbar-nav">
             <li><a href="{{url_for('search.advanced_search')}}" id="advanced_search"><span class="glyphicon glyphicon-search"></span><span class="hidden-sm"> {{_('Advanced Search')}}</span></a></li>
-            {% if simple==true %} <li><a href="{{url_for('basic.index')}}" id="basic"><span class="glyphicon glyphicon-phone"></span><span>{{_('Simple Theme')}}</span></a><li>{% endif %}
+            {% if simple==true %}<li><a href="{{url_for('basic.index')}}" id="basic"><span class="glyphicon glyphicon-phone"></span><span>{{_('Simple Theme')}}</span></a></li>{% endif %}
           </ul>
           {% endif %}
+          
           <ul class="nav navbar-nav navbar-right" id="main-nav">
             {% if current_user.is_authenticated or g.allow_anonymous %}
-              {% if g.current_theme == 1 %}
-              <li class="dropdown"><a href="#" class="dropdown-toggle profileDrop" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false"><span class="glyphicon glyphicon-user"></span></a>
+              
+              <li class="dropdown"><a href="#" class="dropdown-toggle profileDrop" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" title="{{ current_user.name }}"><span class="glyphicon glyphicon-user"></span></a>
                 <ul class="dropdown-menu profileDropli">
                     <li><a id="top_user" data-text="{{_('Account')}}" href="{{url_for('web.profile')}}" ><span class="glyphicon glyphicon-user"></span> <span class="hidden-sm">{{current_user.name}}</span></a></li>
                     {% if g.allow_registration and not current_user.is_authenticated %}
@@ -512,9 +520,9 @@
                     {% if not current_user.is_anonymous %}
                     <li><a id="logout" href="{{url_for('web.logout', next=(request.path + "?" + request.query_string.decode("utf-8")).rstrip("?"))}}"><span class="glyphicon glyphicon-log-out"></span> <span class="hidden-sm">{{_('Logout')}}</span></a></li>
                     {% endif %}
-                </ul>
+                </ul> 
               </li>
-              {% endif %}
+              
               {% if current_user.role_upload() and g.allow_upload %}
                   <li>
                     <form id="form-upload" class="navbar-form" action="{{ url_for('edit-book.upload') }}" data-title="{{_('Uploading...')}}" data-footer="{{_('Close')}}" data-failed="{{_('Error')}}" data-message="{{_('Upload done, processing, please wait...')}}" method="post" enctype="multipart/form-data">
@@ -531,16 +539,7 @@
               {% if current_user.role_admin() %}
                 <li><a id="top_admin" data-text="{{_('Settings')}}" href="{{url_for('admin.admin')}}"><span class="glyphicon glyphicon-dashboard"></span> <span class="hidden-sm">{{_('Admin')}}</span></a></li>
               {% endif %}
-              {% if g.current_theme == 0 %}
-              <li><a id="top_user" data-text="{{_('Account')}}" href="{% if not current_user.is_anonymous %}{{url_for('web.profile')}}{% else %}{{url_for('web.login', next=(request.path + "?" + request.query_string.decode("utf-8")).rstrip("?"))}}{% endif %}"><span class="glyphicon glyphicon-user"></span> <span class="hidden-sm">{{current_user.name}}</span></a></li>
-                {% if not current_user.is_anonymous %}
-                <li><a id="logout" href="{{url_for('web.logout', next=(request.path + "?" + request.query_string.decode("utf-8")).rstrip("?"))}}"><span class="glyphicon glyphicon-log-out"></span> <span class="hidden-sm">{{_('Logout')}}</span></a></li>
-                {% endif %}
-              {% endif %}
-            {% endif %}
-            {% if g.allow_registration and not current_user.is_authenticated and g.current_theme == 0 %}
-            <li><a id="login" href="{{url_for('web.login')}}"><span class="glyphicon glyphicon-log-in"></span> {{_('Login')}}</a></li>
-            <li><a id="register" href="{{url_for('web.register')}}"><span class="glyphicon glyphicon-user"></span> {{_('Register')}}</a></li>
+              
             {% endif %}
           </ul>
         </div></div>
@@ -934,13 +933,6 @@
             });
         });
     </script>
-
-    {% if g.current_theme == 1 %}
-      <script src="{{ url_for('static', filename='js/libs/jquery.visible.min.js') }}"></script>
-      <script src="{{ url_for('static', filename='js/libs/compromise.min.js') }}"></script>
-      <script src="{{ url_for('static', filename='js/libs/readmore.min.js') }}"></script>
-      <script src="{{ url_for('static', filename='js/caliBlur.js') }}"></script>
-    {% endif %}
     {% block js %}{% endblock %}
     
     <div id="pagination-loading-overlay">
