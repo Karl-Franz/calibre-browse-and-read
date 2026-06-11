@@ -2569,10 +2569,6 @@ msgstr ""
 msgid "Standard Theme"
 msgstr ""
 
-#: cps/templates/config_view_edit.html:43
-msgid "caliBlur! Dark Theme"
-msgstr ""
-
 #: cps/templates/config_view_edit.html:47
 msgid "Regular Expression for Ignoring Columns"
 msgstr ""
