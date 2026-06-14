@@ -6,20 +6,6 @@
         <!-- Always use full-sized image for the book edit page -->
         <img id="detailcover" title="{{book.title}}" src="{{url_for('web.get_cover', book_id=book.id, resolution='og', c=book|last_modified)}}" />
     </div>
-{% if current_user.role_delete_books() %}
-    <div class="text-center">
-      <button type="button" class="btn btn-danger" id="delete" data-toggle="modal" data-delete-id="{{ book.id }}" data-target="#deleteModal">{{_("Delete Book")}}</button>
-    </div>
-    {% if book.data|length > 1 %}
-      <div class="text-center more-stuff"><h4>{{_('Delete formats:')}}</h4>
-      {% for file in book.data %}
-        <div class="form-group">
-          <button type="button" class="btn btn-danger" id="delete_format" data-toggle="modal" data-delete-id="{{ book.id }}" data-delete-format="{{ file.format }}" data-target="#deleteModal">{{_('Delete')}} - {{file.format}}</button>
-        </div>
-      {% endfor %}
-      </div>
-    {% endif %}
-{% endif %}
 
 {%  if source_formats|length > 0 and conversion_formats|length > 0 %}
   <div class="text-center more-stuff"><h4>{{_('Convert book format:')}}</h4>
@@ -209,14 +195,6 @@
           </div>
         {% endfor %}
       {% endif %}
-
-    <div class="checkbox">
-      <label>
-        <input name="detail_view" type="checkbox" checked> {{_('View Book on Save')}}
-      </label>
-    </div>
-    <a href="#" id="get_meta" class="btn btn-default" data-toggle="modal" data-target="#metaModal">{{_('Fetch Metadata')}}</a>
-    <button type="submit" id="submit" class="btn btn-default">{{_('Save')}}</button>
     <a href="{{ url_for('web.show_book', book_id=book.id) }}" id="edit_cancel" class="btn btn-default">{{_('Cancel')}}</a>
   </div>
 </form>

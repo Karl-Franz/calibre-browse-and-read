@@ -1,0 +1,6 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:system"
+    "python.analysis.extraPaths": [
+        "/Users/karlfranz/.local/pipx/venvs/calibreweb/lib/python3.12/site-packages"
+    ]
+}

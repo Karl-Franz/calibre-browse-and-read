@@ -1,3 +1,4 @@
+
 {% extends "layout.html" %}
 {% macro display_bool_setting(setting_value) -%}
   {% if setting_value %}<span class="glyphicon glyphicon-ok"></span>{% else %}<span class="glyphicon glyphicon-remove"></span>{% endif %}
@@ -16,13 +17,8 @@
             <th>{{_('Downloads')}}</th>
             <th class="hidden-xs ">{{_('Admin')}}</th>
             <th class="hidden-xs hidden-sm">{{_('Password')}}</th>
-          {% if config.config_uploading %}
-            <th class="hidden-xs hidden-sm">{{_('Upload')}}</th>
-          {%  endif %}
             <th class="hidden-xs hidden-sm">{{_('Download')}}</th>
             <th class="hidden-xs hidden-sm hidden-md">{{_('View Books')}}</th>
-            <th class="hidden-xs hidden-sm hidden-md">{{_('Edit')}}</th>
-            <th class="hidden-xs hidden-sm hidden-md">{{_('Delete')}}</th>
             <th class="hidden-xs hidden-sm hidden-md">{{_('Public Shelf')}}</th>
         </tr>
         {% for user in allUser %}
@@ -34,13 +30,8 @@
             <td>{{user.downloads.count()}}</td>
             <td class="hidden-xs">{{ display_bool_setting(user.role_admin()) }}</td>
             <td class="hidden-xs hidden-sm">{{ display_bool_setting(user.role_passwd()) }}</td>
-            {% if config.config_uploading %}
-            <td class="hidden-xs hidden-sm">{{ display_bool_setting(user.role_upload()) }}</td>
-            {%  endif %}
             <td class="hidden-xs hidden-sm">{{ display_bool_setting(user.role_download()) }}</td>
             <td class="hidden-xs hidden-sm hidden-md">{{ display_bool_setting(user.role_viewer()) }}</td>
-            <td class="hidden-xs hidden-sm hidden-md">{{ display_bool_setting(user.role_edit()) }}</td>
-            <td class="hidden-xs hidden-sm hidden-md">{{ display_bool_setting(user.role_delete_books()) }}</td>
             <td class="hidden-xs hidden-sm hidden-md">{{ display_bool_setting(user.role_edit_shelfs()) }}</td>
           </tr>
           {% endif %}
@@ -130,10 +121,6 @@
             <div class="col-xs-6 col-sm-5">{{config.config_books_per_page}}</div>
         </div>
         <div class="row">
-            <div class="col-xs-6 col-sm-7">{{_('Uploads')}}</div>
-            <div class="col-xs-6 col-sm-5">{{ display_bool_setting(config.config_uploading) }}</div>
-        </div>
-        <div class="row">
             <div class="col-xs-6 col-sm-7">{{_('Anonymous Browsing')}}</div>
             <div class="col-xs-6 col-sm-5">{{ display_bool_setting(config.config_anonbrowse) }}</div>
         </div>
@@ -186,11 +173,6 @@
             <div class="col-xs-6 col-sm-3">{{_('Reconnect Calibre Database')}}</div>
             <div class="col-xs-6 col-sm-3">{{ display_bool_setting(config.schedule_reconnect) }}</div>
           </div>
-          <div class="row">
-            <div class="col-xs-6 col-sm-3">{{_('Generate Metadata Backup Files')}}</div>
-            <div class="col-xs-6 col-sm-3">{{ display_bool_setting(config.schedule_metadata_backup) }}</div>
-          </div>
-
         </div>
       <a class="btn btn-default scheduledtasks" id="admin_edit_scheduled_tasks" href="{{url_for('admin.edit_scheduledtasks')}}">{{_('Edit Scheduled Tasks Settings')}}</a>
       {% if config.schedule_generate_book_covers %}
@@ -211,11 +193,6 @@
     <div class="btn btn-default" id="admin_restart" data-toggle="modal" data-target="#RestartDialog">{{_('Restart')}}</div>
     <div class="btn btn-default" id="admin_stop" data-toggle="modal" data-target="#ShutdownDialog">{{_('Shutdown')}}</div>
   </div>
-{% if config.schedule_metadata_backup %}
-  <div class="row form-group">
-    <div class="btn btn-default" id="metadata_backup" data-toggle="modal" data-target="#StatusDialog">{{_('Queue all books for metadata backup')}}</div>
-  </div>
-{%  endif %}
   <div class="row">
     <div class="col">
       <h2>{{_('Version Information')}}</h2>

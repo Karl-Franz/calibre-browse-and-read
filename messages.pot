@@ -2263,7 +2263,7 @@ msgid "Logfile Configuration"
 msgstr ""
 
 #: cps/templates/config_edit.html:77
-msgid "Location and name of logfile (calibre-web.log for no entry)"
+msgid "Location and name of logfile (calibre-web.log if blank)"
 msgstr ""
 
 #: cps/templates/config_edit.html:82
@@ -2271,7 +2271,7 @@ msgid "Enable Access Log"
 msgstr ""
 
 #: cps/templates/config_edit.html:85
-msgid "Location and name of access logfile (access.log for no entry)"
+msgid "Location and name of access logfile (access.log if blank)"
 msgstr ""
 
 #: cps/templates/config_edit.html:96

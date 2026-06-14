@@ -534,19 +534,6 @@
                     {% endif %}
                 </ul> 
               </li>
-              
-              {% if current_user.role_upload() and g.allow_upload %}
-                  <li>
-                    <form id="form-upload" class="navbar-form" action="{{ url_for('edit-book.upload') }}" data-title="{{_('Uploading...')}}" data-footer="{{_('Close')}}" data-failed="{{_('Error')}}" data-message="{{_('Upload done, processing, please wait...')}}" method="post" enctype="multipart/form-data">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <div class="form-group">
-                        <span class="btn btn-default btn-file">{{_('Upload')}}<input id="btn-upload" name="btn-upload"
-                        type="file" accept="{% for format in accept %}.{% if format != ''%}{{format}}{% else %}*{% endif %}{{ ',' if not loop.last }}{% endfor %}" multiple></span>
-                        <input class="hide" id="btn-upload2" name="btn-upload2" type="file" accept="{% for format in accept %}.{% if format != ''%}{{format}}{% else %}*{% endif %}{{ ',' if not loop.last }}{% endfor %}">
-                      </div>
-                    </form>
-                  </li>
-              {% endif %}
              
               {% if current_user.role_admin() %}
                 <li><a id="top_admin" data-text="{{_('Settings')}}" href="{{url_for('admin.admin')}}"><span class="glyphicon glyphicon-dashboard"></span> <span class="hidden-sm">{{_('Admin')}}</span></a></li>

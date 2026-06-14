@@ -142,11 +142,8 @@
             {{ user_table_row('denied_column_value', _("Edit Denied Column Values"), _("Denied Column Values"), false, custom_values) }}
             {{ user_checkbox_row("role", "admin_role", _('Admin'), visiblility, all_roles)}}
             {{ user_checkbox_row("role", "passwd_role", _('Change Password'), visiblility, all_roles)}}
-            {{ user_checkbox_row("role", "upload_role",_('Upload'), visiblility, all_roles)}}
             {{ user_checkbox_row("role", "download_role", _('Download'), visiblility, all_roles)}}
             {{ user_checkbox_row("role", "viewer_role", _('View'), visiblility, all_roles)}}
-            {{ user_checkbox_row("role", "edit_role", _('Edit'), visiblility, all_roles)}}
-            {{ user_checkbox_row("role", "delete_role", _('Delete'), visiblility, all_roles)}}
             {{ user_checkbox_row("role", "edit_shelf_role", _('Edit Public Shelves'), visiblility, all_roles)}}
             {%  if kobo_support %}
             {{ user_single_checkbox_row("kobo_only_shelves_sync", _('Sync selected Shelves with Kobo'))}}
