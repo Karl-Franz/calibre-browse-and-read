@@ -184,7 +184,7 @@
 
         /* --- THUMBNAIL GRID --- */
         #thumbnail-grid { display: grid; gap: 15px; padding: 15px; }
-        #thumbnail-grid.layout-single { grid-template-columns: repeat(1, 1fr); padding: 15px 50px; } /* Single column, larger thumbs */
+        #thumbnail-grid.layout-single { grid-template-columns: repeat(1, 1fr); padding: 5px; } /* Single column, larger thumbs */
         #thumbnail-grid.layout-spread { grid-template-columns: repeat(2, 1fr); }
         
         /* The Offset Magic for Book Mode */
@@ -720,33 +720,41 @@
                 $('#page-indicator').text(text);
             }
 
+            
             function updateActiveThumbnails() {
                 $('.thumb-canvas-wrapper').removeClass('active-thumb active-thumb-left active-thumb-right');
-                var effectiveLayout = getEffectiveLayout();
-                var leftPageNum = 0;
-                var rightPageNum = 0;
-
-                if (effectiveLayout === 'single') {
-                    rightPageNum = pageNum;
-                } else if (effectiveLayout === 'odd') {
-                    leftPageNum = (pageNum % 2 === 0) ? pageNum : pageNum - 1;
-                    rightPageNum = leftPageNum + 1;
-                } else if (effectiveLayout === 'even') {
-                    leftPageNum = (pageNum % 2 !== 0) ? pageNum : pageNum - 1;
-                    rightPageNum = leftPageNum + 1;
-                }
-                
                 var $grid = $('#thumbnail-grid');
                 $grid.removeClass('layout-single layout-spread layout-book');
-                
-                if (effectiveLayout === 'single') {
-                    $grid.addClass('layout-single');
-                    $('.thumb-container[data-page="' + rightPageNum + '"] .thumb-canvas-wrapper').addClass('active-thumb');
-                } else {
+
+                // Determine thumbnail grid layout independently of the main view
+                var isLandscape = window.innerWidth > window.innerHeight;
+                var useSpreadThumbs = isLandscape || window.innerWidth >= 768; // Use spread on landscape or large portrait screens (e.g., iPad)
+
+                if (useSpreadThumbs) {
                     $grid.addClass('layout-spread');
-                    if (effectiveLayout === 'odd') $grid.addClass('layout-book');
+                    if (readerSettings.layout === 'odd') {
+                        $grid.addClass('layout-book');
+                    }
+                } else {
+                    $grid.addClass('layout-single');
+                }
+
+                // Determine which thumbnails to highlight based on the MAIN view's layout
+                var effectiveLayout = getEffectiveLayout();
+                if (effectiveLayout === 'single') {
+                    // Main view is single page, so only highlight the current page number
+                    $('.thumb-container[data-page="' + pageNum + '"] .thumb-canvas-wrapper').addClass('active-thumb');
+                } else {
+                    // Main view is a spread, so highlight two pages
+                    var leftPageNum, rightPageNum;
+                    if (effectiveLayout === 'odd') {
+                        leftPageNum = (pageNum % 2 === 0) ? pageNum : pageNum - 1;
+                        rightPageNum = leftPageNum + 1;
+                    } else { // 'even'
+                        leftPageNum = (pageNum % 2 !== 0) ? pageNum : pageNum - 1;
+                        rightPageNum = leftPageNum + 1;
+                    }
                     
-                    // Verify pages actually exist before bridging them
                     var leftExists = leftPageNum > 0 && leftPageNum <= pdfDoc.numPages;
                     var rightExists = rightPageNum > 0 && rightPageNum <= pdfDoc.numPages;
 
@@ -760,6 +768,9 @@
                     }
                 }
             }
+
+
+
 
             function initThumbnails() {
                 var $grid = $('#thumbnail-grid');
@@ -789,7 +800,11 @@
                                 canvas.dataset.rendered = "true"; // Prevent double-rendering
                                 
                                 pdfDoc.getPage(pageNum).then(function(page) {
-                                    var viewport = page.getViewport({ scale: 0.25 }); // Render at 25% scale for speed
+                                    var wrapper = $container.find('.thumb-canvas-wrapper')[0];
+                                    var unscaledViewport = page.getViewport({ scale: 1.0 });
+                                    var scale = wrapper.clientWidth / unscaledViewport.width;
+                                    var viewport = page.getViewport({ scale: scale });
+
                                     canvas.width = viewport.width;
                                     canvas.height = viewport.height;
                                     var ctx = canvas.getContext('2d');
@@ -808,7 +823,7 @@
                 
                 $('.thumb-container').on('click', function() {
                     transitionToPage($(this).data('page'));
-                    if (window.innerWidth < 800) $('#toc-menu').removeClass('open');
+                    if (window.innerWidth < 768) $('#toc-menu').removeClass('open');
                 });
             }
 
