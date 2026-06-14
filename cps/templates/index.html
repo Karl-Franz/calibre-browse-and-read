@@ -926,6 +926,29 @@
             }
             $('#pagination-loading-overlay').css('display', 'flex');
         });
+
+    }); // <-- THIS CLOSES DOCUMENT.READY
+
+    // --- EXPERIMENTAL ISOTOPE ENGINE (ALL BOOKS) ---
+    // Moved OUTSIDE of document.ready so it doesn't miss the load event!
+    $(window).on('load', function() {
+        // Target the main grid container
+        var $isoGrid = $('.browse-books > .row.display-flex').first();
+        
+        // Only initialize if there are books on the page
+        if ($isoGrid.find('.book.session').length > 0) {
+            $isoGrid.isotope({
+                itemSelector: '.book.session',
+                layoutMode: 'fitRows',
+                transitionDuration: '0.4s' // Matches the smooth Discover page speed
+            });
+
+            // Because our top-bar slider fires a 'resize' event, we just need 
+            // to tell Isotope to listen for it and recalculate the math!
+            $(window).on('resize', function() {
+                $isoGrid.isotope('layout');
+            });
+        }
     });
 </script>
 {% endblock %}

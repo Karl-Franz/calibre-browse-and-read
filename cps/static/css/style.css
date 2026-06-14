@@ -759,8 +759,7 @@ body .currently-reading-section .cr-book {
     
     padding-left: 10px !important;
     padding-right: 10px !important;
-    margin-bottom: 25px !important;
-    display: block !important;
+    margin-bottom: 25px !important;s
     
     /* transition: width 0.1s ease-out, min-width 0.1s ease-out, max-width 0.1s ease-out, flex 0.1s ease-out !important; */
 }
@@ -786,6 +785,23 @@ body .book .meta .series,
 body .book .meta .author,
 body .cr-book .meta .author {
     font-size: calc(12px * var(--cover-zoom)) !important;
+}
+
+/* 5. Force the text container to clear its own height so Isotope never miscalculates */
+body .book .meta,
+body .cr-book .meta {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+/* 6. Prevent text from overwriting itself when wrapping to multiple lines */
+body .book .meta .title,
+body .cr-book .meta .title,
+body .book .meta .author,
+body .cr-book .meta .author {
+    line-height: 1.3 !important; 
+    white-space: normal !important;
 }
 
 /* ==========================================================================

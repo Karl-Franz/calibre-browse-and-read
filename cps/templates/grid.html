@@ -188,5 +188,27 @@
             }
         }
     });
+    // --- ISOTOPE RESIZE LISTENER (RACE CONDITION FIX) ---
+        $(window).on('resize', function() {
+            var $gridList = $('#list');
+            
+            if ($gridList.data('isotope')) {
+                // 1. Instantly kill the animation so the GPU doesn't choke
+                $gridList.isotope({ transitionDuration: 0 });
+                
+                // 2. WAIT 50 milliseconds! Give the browser time to physically 
+                // apply the CSS, shrink the covers, and wrap the text BEFORE doing math.
+                clearTimeout(window.isotopeMathTimer);
+                window.isotopeMathTimer = setTimeout(function() {
+                    $gridList.isotope('layout');
+                }, 50);
+                
+                // 3. Turn the glide animation back on after everything settles
+                clearTimeout(window.isotopeRestoreTimer);
+                window.isotopeRestoreTimer = setTimeout(function() {
+                    $gridList.isotope({ transitionDuration: '0.4s' });
+                }, 200);
+            }
+        });
 </script>
 {% endblock %}

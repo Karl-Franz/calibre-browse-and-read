@@ -449,6 +449,13 @@
             border-bottom: 2px solid #000000 !important;
         }
     </style>
+    
+    <style>
+        :root {
+            --cover-zoom: {{ request.cookies.get('cw_cover_zoom', '1.0') }};
+        }
+    </style>
+    
     <script>
         // Calibre-Web Tablet Edition: Dynamic Theme Router
         (function() {
@@ -510,7 +517,7 @@
           <ul class="nav navbar-nav navbar-right" id="main-nav">
               
               <li class="hidden-xs" style="padding: 18px 15px; width: 120px;">
-                  <input type="range" id="cover-zoom-slider" min="0.5" max="1.0" step="0.05" value="1.0" style="width: 100%; cursor: pointer;" title="{{_('Cover Size')}}">
+                  <input type="range" id="cover-zoom-slider" min="0.5" max="1.0" step="0.05" value="{{ request.cookies.get('cw_cover_zoom', '1.0') }}" style="width: 100%; cursor: pointer;" title="{{_('Cover Size')}}">
               </li>
 
             {% if current_user.is_authenticated or g.allow_anonymous %}
@@ -937,19 +944,16 @@
                 window.location.reload();
             });
         });
-        // --- DYNAMIC COVER ZOOM LOGIC ---
+        // --- DYNAMIC COVER ZOOM LOGIC (SERVER-SYNCED) ---
         var zoomSlider = document.getElementById('cover-zoom-slider');
         
-        // 1. Load saved zoom level from memory
-        var savedZoom = localStorage.getItem('cw_cover_zoom');
-        if (savedZoom) {
-            // Safeguard: Cap any old cached zoom at 1.0 so it doesn't break the layout
-            savedZoom = Math.min(parseFloat(savedZoom), 1.0).toString();
-            
-            document.documentElement.style.setProperty('--cover-zoom', savedZoom);
-            if (zoomSlider) {
-                zoomSlider.value = savedZoom;
-            }
+        // 1. One-time Migration: Move old localStorage setting to the new Cookie system
+        var savedLocal = localStorage.getItem('cw_cover_zoom');
+        if (savedLocal && !document.cookie.includes('cw_cover_zoom=')) {
+            savedLocal = Math.min(parseFloat(savedLocal), 1.0).toString();
+            document.cookie = "cw_cover_zoom=" + savedLocal + "; max-age=31536000; path=/";
+            document.documentElement.style.setProperty('--cover-zoom', savedLocal);
+            if (zoomSlider) zoomSlider.value = savedLocal;
         }
 
         // 2. Listen for slider movement in real-time with Throttling
@@ -959,11 +963,13 @@
             zoomSlider.addEventListener('input', function(e) {
                 var zoomVal = e.target.value;
                 
-                // Instantly scale the CSS variable (Lightweight)
+                // Instantly scale the CSS variable visually
                 document.documentElement.style.setProperty('--cover-zoom', zoomVal);
-                localStorage.setItem('cw_cover_zoom', zoomVal);
+                
+                // Save to Cookie so the server knows the size BEFORE the next page load
+                document.cookie = "cw_cover_zoom=" + zoomVal + "; max-age=31536000; path=/";
 
-                // Throttle the JS animation trigger to 10 frames per second (Heavyweight)
+                // Throttle the JS animation trigger to 10 frames per second
                 var now = new Date().getTime();
                 if (now - lastReflowTime >= 100) {
                     window.dispatchEvent(new Event('resize'));
