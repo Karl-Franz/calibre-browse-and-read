@@ -731,3 +731,68 @@ body {
     animation: spin 1s linear infinite; margin: 0 auto;
 }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* ==========================================================================
+   DYNAMIC COVER SCALING (BULLETPROOF FLEXBOX)
+   ========================================================================== */
+:root {
+    --cover-zoom: 1.0;
+}
+
+/* 1. Ensure the parent row actually allows wrapping */
+body .row.display-flex {
+    display: flex !important;
+    flex-wrap: wrap !important;
+}
+
+/* 2. Crush Bootstrap's rigid column widths and force dynamic sizing */
+body .row.display-flex > .book,
+body .row.display-flex > div[class*="col-"],
+body .currently-reading-section .cr-book {
+    /* Force the width to exactly match the slider math */
+    width: calc(180px * var(--cover-zoom)) !important;
+    flex: 0 0 calc(180px * var(--cover-zoom)) !important;
+    
+    /* Nuclear overrides to prevent Bootstrap from stretching it back to 25% */
+    max-width: calc(180px * var(--cover-zoom)) !important;
+    min-width: calc(180px * var(--cover-zoom)) !important;
+    
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    margin-bottom: 25px !important;
+    display: block !important;
+    
+    /* transition: width 0.1s ease-out, min-width 0.1s ease-out, max-width 0.1s ease-out, flex 0.1s ease-out !important; */
+}
+
+/* 3. Scale the fixed cover heights proportionally so images don't stretch */
+body .container-fluid .book .cover,
+body .container-fluid .single .cover,
+body .cr-book .cover {
+    height: calc(225px * var(--cover-zoom)) !important;
+    margin-bottom: 10px !important;
+
+    /* transition: height 0.1s ease-out !important; */
+}
+
+/* 4. Scale text down so it stays readable on tiny covers */
+body .book .meta .title,
+body .cr-book .meta .title {
+    font-size: calc(15px * var(--cover-zoom)) !important;
+    line-height: 1.2 !important;
+}
+body .book .meta .author-name, 
+body .book .meta .series,
+body .book .meta .author,
+body .cr-book .meta .author {
+    font-size: calc(12px * var(--cover-zoom)) !important;
+}
+
+/* ==========================================================================
+   MODAL COVER FIX (Prevents buttons from overlapping the image)
+   ========================================================================== */
+#bookDetailsModal .cover {
+    height: auto !important;
+    min-height: 0 !important;
+    margin-bottom: 15px !important; /* Adds breathing room before the buttons */
+}

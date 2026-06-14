@@ -508,6 +508,11 @@
           {% endif %}
           
           <ul class="nav navbar-nav navbar-right" id="main-nav">
+              
+              <li class="hidden-xs" style="padding: 18px 15px; width: 120px;">
+                  <input type="range" id="cover-zoom-slider" min="0.5" max="1.0" step="0.05" value="1.0" style="width: 100%; cursor: pointer;" title="{{_('Cover Size')}}">
+              </li>
+
             {% if current_user.is_authenticated or g.allow_anonymous %}
               
               <li class="dropdown"><a href="#" class="dropdown-toggle profileDrop" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" title="{{ current_user.name }}"><span class="glyphicon glyphicon-user"></span></a>
@@ -932,6 +937,45 @@
                 window.location.reload();
             });
         });
+        // --- DYNAMIC COVER ZOOM LOGIC ---
+        var zoomSlider = document.getElementById('cover-zoom-slider');
+        
+        // 1. Load saved zoom level from memory
+        var savedZoom = localStorage.getItem('cw_cover_zoom');
+        if (savedZoom) {
+            // Safeguard: Cap any old cached zoom at 1.0 so it doesn't break the layout
+            savedZoom = Math.min(parseFloat(savedZoom), 1.0).toString();
+            
+            document.documentElement.style.setProperty('--cover-zoom', savedZoom);
+            if (zoomSlider) {
+                zoomSlider.value = savedZoom;
+            }
+        }
+
+        // 2. Listen for slider movement in real-time with Throttling
+        if (zoomSlider) {
+            var lastReflowTime = 0;
+
+            zoomSlider.addEventListener('input', function(e) {
+                var zoomVal = e.target.value;
+                
+                // Instantly scale the CSS variable (Lightweight)
+                document.documentElement.style.setProperty('--cover-zoom', zoomVal);
+                localStorage.setItem('cw_cover_zoom', zoomVal);
+
+                // Throttle the JS animation trigger to 10 frames per second (Heavyweight)
+                var now = new Date().getTime();
+                if (now - lastReflowTime >= 100) {
+                    window.dispatchEvent(new Event('resize'));
+                    lastReflowTime = now;
+                }
+            });
+
+            // 3. Ensure one final perfect snap when you release the slider
+            zoomSlider.addEventListener('change', function() {
+                window.dispatchEvent(new Event('resize'));
+            });
+        }
     </script>
     {% block js %}{% endblock %}
     

@@ -55,7 +55,7 @@
         <div id="list" class="row display-flex" style="margin-left: 0; margin-right: 0;">
           {% for entry in entries %}
               
-              <div class="col-sm-3 col-lg-2 col-xs-6 book sortable {% if entry.count > 1 %}is-stack{% endif %}" {% if entry[0].sort %}data-name="{{entry[0].series[0].name}}"{% endif %} data-id="{% if entry[0].series[0].name %}{{entry[0].series[0].name}}{% endif %}" style="padding-left: 10px; padding-right: 10px;">
+              <div class="book sortable {% if entry.count > 1 %}is-stack{% endif %}" {% if entry[0].sort %}data-name="{{entry[0].series[0].name}}"{% endif %} data-id="{% if entry[0].series[0].name %}{{entry[0].series[0].name}}{% endif %}" style="padding-left: 10px; padding-right: 10px;">
                   <div class="cover">
                       {% if entry.count == 1 %}
                       <a href="{{url_for('web.show_book', book_id=entry[0].id )}}" data-toggle="modal" data-target="#bookDetailsModal" data-remote="false">
