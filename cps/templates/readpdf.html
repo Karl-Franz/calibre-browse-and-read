@@ -78,6 +78,17 @@
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 35vw;
         }
 
+        /* --- PAN & ZOOM LOCK --- */
+        #pdf-layout-container.is-dragging { 
+            transition: none !important; 
+            cursor: grabbing !important; 
+        }
+        #viewer-wrapper.zoom-unlocked { 
+            overflow: hidden !important; 
+            touch-action: none; 
+            cursor: grab; 
+        }
+
         /* --- IMMERSIVE VIEWER CONTAINER --- */
         #viewer-wrapper {
             position: absolute; top: 0; bottom: 0; left: 0; right: 0;
@@ -408,6 +419,16 @@
                     <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
                 </svg>
             </button>
+            <button id="btn-zoom-lock" class="header-btn" title="Unlock to Adjust Zoom/Pan (Double-click to reset)" style="margin-right: 5px; color: #666;">
+                <svg id="icon-padlock-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                <svg id="icon-padlock-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none; color: #007bff;">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                </svg>
+            </button>
             <button id="btn-settings" class="header-btn">Aa</button>
         </div>
     </div>
@@ -558,13 +579,109 @@
         }
 
         $(document).ready(function() {
+            // --- ZOOM & PAN LOCK ENGINE ---
+            var pzScale = 1.0;
+            var pzX = 0;
+            var pzY = 0;
+            var isZoomUnlocked = false;
+            var isDragging = false;
+            var startX, startY;
+            var initialPinchDistance = null;
+            var initialPzScale = 1.0;
+
+            var $pzBtn = $('#btn-zoom-lock');
+            var $viewer = $('#viewer-wrapper');
+            var $layout = $('#pdf-layout-container');
+
+            $pzBtn.on('click', function() {
+                isZoomUnlocked = !isZoomUnlocked;
+                if (isZoomUnlocked) {
+                    $('#icon-padlock-closed').hide();
+                    $('#icon-padlock-open').show();
+                    $viewer.addClass('zoom-unlocked');
+                } else {
+                    $('#icon-padlock-open').hide();
+                    $('#icon-padlock-closed').show();
+                    $viewer.removeClass('zoom-unlocked');
+                }
+            });
+
+            // Double click the padlock to instantly reset to 100%
+            $pzBtn.on('dblclick', function() {
+                pzScale = 1.0; pzX = 0; pzY = 0;
+                applyPanZoom();
+            });
+
+            // Desktop: Mouse Wheel to Zoom
+            $viewer.on('wheel', function(e) {
+                if (!isZoomUnlocked) return;
+                e.preventDefault(); 
+                var delta = e.originalEvent.deltaY;
+                if (delta > 0) pzScale -= 0.05; 
+                else pzScale += 0.05; 
+                
+                if (pzScale < 0.5) pzScale = 0.5;
+                if (pzScale > 5.0) pzScale = 5.0;
+                applyPanZoom();
+            });
+
+            // Touch & Mouse: Start Pan or Pinch
+            $viewer.on('mousedown touchstart', function(e) {
+                if (!isZoomUnlocked) return;
+                var touches = e.originalEvent.touches;
+                if (touches && touches.length === 2) {
+                    initialPinchDistance = Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
+                    initialPzScale = pzScale;
+                } else {
+                    isDragging = true;
+                    $layout.addClass('is-dragging');
+                    var pointer = touches ? touches[0] : e;
+                    startX = pointer.pageX - pzX;
+                    startY = pointer.pageY - pzY;
+                }
+            });
+
+            // Touch & Mouse: Move Pan or Pinch
+            $(window).on('mousemove touchmove', function(e) {
+                if (!isZoomUnlocked) return;
+                var touches = e.originalEvent.touches;
+                if (touches && touches.length === 2 && initialPinchDistance) {
+                    e.preventDefault();
+                    var currentDistance = Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
+                    pzScale = initialPzScale * (currentDistance / initialPinchDistance);
+                    if (pzScale < 0.5) pzScale = 0.5;
+                    if (pzScale > 5.0) pzScale = 5.0;
+                    applyPanZoom();
+                } else if (isDragging) {
+                    e.preventDefault();
+                    var pointer = touches ? touches[0] : e;
+                    pzX = pointer.pageX - startX;
+                    pzY = pointer.pageY - startY;
+                    applyPanZoom();
+                }
+            });
+
+            $(window).on('mouseup touchend', function() {
+                isDragging = false;
+                initialPinchDistance = null;
+                $layout.removeClass('is-dragging');
+            });
+
+            function applyPanZoom() {
+                $layout.css('transform', 'translate(' + pzX + 'px, ' + pzY + 'px) scale(' + pzScale + ')');
+                readerSettings.pzScale = pzScale;
+                readerSettings.pzX = pzX;
+                readerSettings.pzY = pzY;
+                syncProgress();
+            }
+
             var localKey = "cw_settings_pdf_{{ pdffile }}";
             var $dataNode = $('#cw-reader-data');
             var rawDbSettings = $dataNode.data('settings');
             var currentLocationStr = $dataNode.attr('data-location');   
             
             // New Streamlined Defaults
-            var readerSettings = { navMode: 'tap', theme: 'auto', layout: 'odd', forceSingleLandscape: false };
+            var readerSettings = { navMode: 'tap', theme: 'auto', layout: 'odd', forceSingleLandscape: false, pzScale: 1.0, pzX: 0, pzY: 0 };
             
             try {
                 if (rawDbSettings && rawDbSettings !== "None" && rawDbSettings !== "") {
@@ -575,6 +692,11 @@
                     if (localStr) Object.assign(readerSettings, JSON.parse(localStr));
                 }
             } catch(e) { console.warn("[DEBUG] Settings Parse Error:", e); }
+
+            // Load saved zoom coordinates into the engine
+            pzScale = readerSettings.pzScale;
+            pzX = readerSettings.pzX;
+            pzY = readerSettings.pzY;
 
             // Upgrade legacy settings seamlessly
             if (readerSettings.layout === 'auto-odd' || readerSettings.layout === 'single') readerSettings.layout = 'odd';
@@ -1412,6 +1534,12 @@
                 var pageHeight = $activePage.height();
                 
                 if (!pageHeight) return;
+
+                // --- NEW: Yield to custom Pan/Zoom Crop ---
+                if (typeof pzScale !== 'undefined' && (pzScale !== 1.0 || pzX !== 0 || pzY !== 0)) {
+                    applyPanZoom();
+                    return;
+                }
 
                 // Header is 50px, Footer is 100px. We need > 150px of extra space to fit it all.
                 if (!isUIHidden && pageHeight <= (screenHeight - 150)) {
