@@ -37,9 +37,12 @@ STATIC_DIR          = os.path.join(BASE_DIR, 'cps', 'static')
 TEMPLATES_DIR       = os.path.join(BASE_DIR, 'cps', 'templates')
 TRANSLATIONS_DIR    = os.path.join(BASE_DIR, 'cps', 'translations')
 
-# Cache dir - use CACHE_DIR environment variable, otherwise use the default directory: cps/cache
+# Cache dir - use CACHE_DIRECTORY environment variable, otherwise CACHE_DIR (for backwards compatibility),
+# otherwise use the default directory: cps/cache
 DEFAULT_CACHE_DIR   = os.path.join(BASE_DIR, 'cps', 'cache')
-CACHE_DIR           = os.environ.get('CACHE_DIR', DEFAULT_CACHE_DIR)
+CACHE_DIRECTORY = os.environ.get(
+    'CACHE_DIRECTORY', os.environ.get('CACHE_DIR', DEFAULT_CACHE_DIR)
+)
 
 if HOME_CONFIG:
     home_dir = os.path.join(os.path.expanduser("~"), ".calibre-web")
@@ -172,11 +175,11 @@ BookMeta = namedtuple('BookMeta', 'file_path, extension, title, author, cover, d
                                   'series_id, languages, publisher, pubdate, identifiers')
 
 # python build process likes to have x.y.zbw -> b for beta and w a counting number
-STABLE_VERSION =  '0.8.44'
+STABLE_VERSION =  '1.0.0'
 
 NIGHTLY_VERSION = dict()
-NIGHTLY_VERSION[0] = '776eeccc678a23438f4f1970b4b20fe369ad0fa9'
-NIGHTLY_VERSION[1] = '2026-08-24T09:50:41+02:00'
+NIGHTLY_VERSION[0] = '$Format:%H$'
+NIGHTLY_VERSION[1] = '$Format:%cI$'
 
 # CACHE
 CACHE_TYPE_THUMBNAILS    = 'thumbnails'

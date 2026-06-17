@@ -7,10 +7,10 @@
   <title>{{ entry.title }}</title>
   <meta name="description" content="">
   <meta name="viewport" content="width=device-width">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   {% if g.google_site_verification|length > 0 %}
     <meta name="google-site-verification" content="{{g.google_site_verification}}">
-  {% endif %}  
+  {% endif %}
 
   <script src="{{ url_for('static', filename='js/libs/jquery.min.js') }}"></script>
   <script src="{{ url_for('static', filename='js/libs/soundmanager2.js') }}"></script>
@@ -31,7 +31,7 @@
 
   <div class="row" style="display: inline-block; width: 100%;">
     <div class="col-sm-3 col-lg-3 col-xs-5">
-      
+
     </div>
     <div class="col-sm-6 col-lg-6 book-meta" style="margin-bottom: 2%;">
       <img id="detailcover" title="{{entry.title}}" src="{{url_for('web.get_cover', book_id=entry.id, resolution='og', c=entry|last_modified)}}" style="float: right; margin-top: 20px"/>
@@ -134,7 +134,7 @@
                 {% elif c.datatype == 'datetime' %}
                   {{ column.value|formatdate }}
                 {% elif c.datatype == 'comments' %}
-                  {{column.value|safe}}
+                  {{column.value|clean_string|safe}}
                 {% elif c.datatype == 'series' %}
                   {{ '%s [%s]' % (column.value, column.extra|formatfloat(2)) }}
                 {% elif c.datatype == 'text' %}
@@ -175,7 +175,7 @@
       {% if entry.comments|length > 0 and entry.comments[0].text|length > 0%}
         <div class="comments">
             <h3 id="decription">{{_('Description:')}}</h3>
-            {{entry.comments[0].text|safe}}
+            {{entry.comments[0].text|clean_string|safe}}
         </div>
       {% endif %}
 

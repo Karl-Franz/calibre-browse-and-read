@@ -30,7 +30,7 @@ import requests
 import unidecode
 from uuid import uuid4
 
-from flask import send_from_directory, make_response, abort, url_for, Response, request
+from flask import send_from_directory, make_response, abort, url_for, Response, request, after_this_request
 from flask_babel import gettext as _
 from flask_babel import lazy_gettext as N_
 from flask_babel import get_locale
@@ -307,18 +307,16 @@ def edit_book_read_status(book_id, read_status=None):
     if not config.config_read_column:
         book = ub.session.query(ub.ReadBook).filter(and_(ub.ReadBook.user_id == int(current_user.id),
                                                          ub.ReadBook.book_id == book_id)).first()
-        if book:
-            if read_status is None:
-                if book.read_status == ub.ReadBook.STATUS_FINISHED:
-                    book.read_status = ub.ReadBook.STATUS_UNREAD
-                else:
-                    book.read_status = ub.ReadBook.STATUS_FINISHED
-            else:
-                book.read_status = ub.ReadBook.STATUS_FINISHED if read_status else ub.ReadBook.STATUS_UNREAD
-        else:
+        if not book:
             read_book = ub.ReadBook(user_id=current_user.id, book_id=book_id)
-            read_book.read_status = ub.ReadBook.STATUS_FINISHED
             book = read_book
+        if read_status is None:
+            if book.read_status == ub.ReadBook.STATUS_FINISHED:
+                book.read_status = ub.ReadBook.STATUS_UNREAD
+            else:
+                book.read_status = ub.ReadBook.STATUS_FINISHED
+        else:
+            book.read_status = ub.ReadBook.STATUS_FINISHED if read_status == True else ub.ReadBook.STATUS_UNREAD
         if not book.kobo_reading_state:
             kobo_reading_state = ub.KoboReadingState(user_id=current_user.id, book_id=book_id)
             kobo_reading_state.current_bookmark = ub.KoboBookmark()
@@ -329,7 +327,7 @@ def edit_book_read_status(book_id, read_status=None):
     else:
         try:
             calibre_db.create_functions(config)
-            book = calibre_db.get_filtered_book(book_id)
+            book = calibre_db.get_filtered_book(book_id, True)
             book_read_status = getattr(book, 'custom_column_' + str(config.config_read_column))
             if len(book_read_status):
                 if read_status is None:
@@ -396,10 +394,16 @@ def delete_book_file(book, calibrepath, book_format=None):
 def rename_all_files_on_change(one_book, new_path, old_path, all_new_name, gdrive=False):
     for file_format in one_book.data:
         if not gdrive:
-            if not os.path.exists(new_path):
-                os.makedirs(new_path)
-            shutil.move(os.path.join(old_path, file_format.name + '.' + file_format.format.lower()),
-                    os.path.join(new_path, all_new_name + '.' + file_format.format.lower()))
+            try:
+                if not os.path.exists(new_path):
+                    os.makedirs(new_path)
+                shutil.move(os.path.join(old_path, file_format.name + '.' + file_format.format.lower()),
+                        os.path.join(new_path, all_new_name + '.' + file_format.format.lower()))
+            except (PermissionError, FileNotFoundError) as ex:
+                log.error("Moving book-id %s folder %s failed: %s", one_book.id, new_path, ex)                
+                return _("Moving book path of Book %(book_id)s to: '%(src)s' failed with error: %(error)s",
+                 book_id=one_book.id, src=new_path, error=str(ex))
+            
         else:
             g_file = gd.getFileFromEbooksFolder(old_path,
                                                 file_format.name + '.' + file_format.format.lower())
@@ -412,6 +416,7 @@ def rename_all_files_on_change(one_book, new_path, old_path, all_new_name, gdriv
 
         # change name in Database
         file_format.name = all_new_name
+    return False
 
 
 def rename_author_path(first_author, old_author_dir, renamed_author, calibre_path="", gdrive=False):
@@ -466,14 +471,15 @@ def update_dir_structure_file(book_id, calibre_path, original_filepath, new_auth
                                      db_filename,
                                      original_filepath,
                                      path)
-        new_path = os.path.join(calibre_path, new_author_dir, new_title_dir).replace('\\', '/')
-        all_new_name = get_valid_filename(local_book.title, chars=42) + ' - ' \
-                       + get_valid_filename(new_author, chars=42)
-        # Book folder already moved, only files need to be renamed
-        rename_all_files_on_change(local_book, new_path, new_path, all_new_name)
+        if not error:
+            new_path = os.path.join(calibre_path, new_author_dir, new_title_dir).replace('\\', '/')
+            all_new_name = get_valid_filename(local_book.title, chars=42) + ' - ' \
+                           + get_valid_filename(new_author, chars=42)
+            # Book folder already moved, only files need to be renamed
+            renameerror = rename_all_files_on_change(local_book, new_path, new_path, all_new_name)
 
-        if error:
-            return error
+        if error or renameerror:
+            return error or renameerror
     return False
 
 
@@ -517,7 +523,7 @@ def update_dir_structure_gdrive(book_id, first_author):
     if titledir != new_titledir or authordir != new_authordir :
         all_new_name = get_valid_filename(book.title, chars=42) + ' - ' \
                        + get_valid_filename(new_authordir, chars=42)
-        rename_all_files_on_change(book, book.path, book.path, all_new_name, gdrive=True)  # todo: Move filenames on gdrive
+        return rename_all_files_on_change(book, book.path, book.path, all_new_name, gdrive=True)  # todo: Move filenames on gdrive
     return False
 
 
@@ -553,30 +559,10 @@ def move_files_on_change(calibre_path, new_author_dir, new_titledir, localbook, 
                     log.error("Deleting authorpath for book %s failed: %s", localbook.id, ex)
         # change location in database to new author/title path
         localbook.path = os.path.join(new_author_dir, new_titledir).replace('\\', '/')
-    except OSError as ex:
+    except (OSError, FileNotFoundError) as ex:
         log.error_or_exception("Rename title from {} to {} failed with error: {}".format(path, new_path, ex))
         return _("Rename title from: '%(src)s' to '%(dest)s' failed with error: %(error)s",
                  src=path, dest=new_path, error=str(ex))
-    return False
-
-
-def rename_files_on_change(first_author,
-                           renamed_author,
-                           local_book,
-                           original_filepath="",
-                           path="",
-                           calibre_path="",
-                           gdrive=False):
-    # Rename all files from old names to new names
-    #try:
-        #clean_author_database(renamed_author, calibre_path, gdrive=gdrive)
-        #if first_author and first_author not in renamed_author:
-        #    clean_author_database([first_author], calibre_path, local_book, gdrive)
-        #if not gdrive and not renamed_author and not original_filepath and len(os.listdir(os.path.dirname(path))) == 0:
-        #    shutil.rmtree(os.path.dirname(path))
-    #except (OSError, FileNotFoundError) as ex:
-    #    log.error_or_exception("Error in rename file in path {}".format(ex))
-    #    return _("Error in rename file in path: {}".format(str(ex)))
     return False
 
 
@@ -970,6 +956,17 @@ def do_download_file(book, book_format, client, data, headers):
         else:
             download_name = book_name
 
+    # Clean up staged copies in /tmp/calibre_web after the response is sent
+    # (kepubify / calibre-export branches) so the temp dir does not grow unbounded.
+    if filename == get_temp_dir():
+        _tmp_path = os.path.join(filename, download_name + "." + book_format)
+        @after_this_request
+        def _cleanup_staged_download(resp):
+            try:
+                os.remove(_tmp_path)
+            except OSError as ex:
+                log.warning('Failed to remove staged download %s: %s', _tmp_path, ex)
+            return resp
     response = make_response(send_from_directory(filename, download_name + "." + book_format))
     # ToDo Check headers parameter
     for element in headers:
@@ -1105,14 +1102,17 @@ def get_download_link(book_id, book_format, client):
             file_name = book.title
             if len(book.authors) > 0:
                 file_name = file_name + ' - ' + book.authors[0].name
+            original_name = file_name
+            file_name = get_valid_filename(file_name, replace_whitespace=False, force_unidecode=True)
             if client == "kindle":
-                file_name = get_valid_filename(file_name, replace_whitespace=False, force_unidecode=True)
+                quoted_file_name = file_name
             else:
-                file_name = quote(get_valid_filename(file_name, replace_whitespace=False))
+                native_name = get_valid_filename(original_name, replace_whitespace=False, force_unidecode=False)
+                quoted_file_name = quote(native_name)
             headers = Headers()
             headers["Content-Type"] = mimetypes.types_map.get('.' + book_format, "application/octet-stream")
             headers["Content-Disposition"] = ('attachment; filename="{}.{}"; filename*=UTF-8\'\'{}.{}').format(
-                file_name, book_format, file_name, book_format)
+                file_name, book_format, quoted_file_name, book_format)
             return do_download_file(book, book_format, client, data1, headers)
     else:
         log.error("Book id {} not found for downloading".format(book_id))

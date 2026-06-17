@@ -812,3 +812,221 @@ body .cr-book .meta .author {
     min-height: 0 !important;
     margin-bottom: 15px !important; /* Adds breathing room before the buttons */
 }
+
+/* ==========================================================================
+   GRID: UNIFORM COVER SIZING & STACK EFFECTS
+   ========================================================================== */
+.book .cover {
+    margin-bottom: 12px !important; 
+    position: relative !important;
+}
+
+.book .cover .img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 2 / 2.8; 
+    background-color: #f4f4f4; 
+    border-radius: 4px;
+    position: relative;
+    z-index: 1; 
+}
+
+.book .cover .img img {
+    display: block; 
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    object-fit: fill; 
+}
+
+.book.is-stack .img {
+    border: none; 
+    margin-bottom: 8px; 
+    margin-right: 8px;
+    box-shadow:
+        4px 4px 0 0px #cccccc,
+        8px 8px 0 0px #e6e6e6;
+}
+
+.book { 
+    cursor: pointer; 
+    margin-bottom: 25px; 
+}
+
+/* --- ENLARGE GEAR ICON TOUCH AREA FOR IPAD --- */
+.gear-btn {
+    padding: 15px 20px !important;  
+    margin: -10px -15px !important; 
+    cursor: pointer;
+    display: inline-block;
+}
+
+.gear-btn .glyphicon-cog {
+    font-size: 22px !important;     
+    vertical-align: middle;
+    color: #555;                    
+}
+
+body.index {
+    overflow-y: hidden !important;
+}
+
+@media (min-width: 768px) {
+    .browse-books {
+        margin-top: 140px !important; 
+        height: calc(100vh - 190px) !important;
+    }
+}
+
+/* ==========================================================================
+   QUARANTINED MODAL CSS (Book Details)
+   ========================================================================== */
+#bookDetailsModal .modal-dialog { 
+    width: 90vw !important; 
+    max-width: 1000px !important; 
+    margin: 30px auto !important;
+}
+@media (min-width: 992px) {
+    #bookDetailsModal .modal-dialog { 
+        width: 66vw !important; 
+        max-width: 1600px !important; 
+    }
+}
+
+#bookDetailsModal .modal-header, 
+#bookDetailsModal .modal-footer { 
+    display: none !important; 
+}
+
+#bookDetailsModal .modal-content { 
+    height: auto !important; 
+    max-height: 85vh !important; 
+    overflow: hidden !important; 
+    display: flex !important; 
+    flex-direction: column !important; 
+    width: 100% !important;
+}
+
+#bookDetailsModal .modal-body, 
+#bookDetailsModal .container-fluid { 
+    width: 100% !important;
+    padding: 0 !important;
+    display: flex !important;
+    justify-content: flex-start !important;
+    position: relative !important;
+} 
+
+#bookDetailsModal .single {
+    margin-left: 0 !important;
+    margin-right: auto !important; 
+    width: 100% !important;
+    height: auto !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important; 
+}
+
+#bookDetailsModal .single > .row {
+    height: auto !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important; 
+}
+
+#bookDetailsModal .single > .row > div:nth-child(1) {
+    flex: 0 0 250px !important; 
+    width: 250px !important; 
+}
+
+#bookDetailsModal .single > .row > div:nth-child(2) {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+#bookDetailsModal .single .col-sm-9 .row > .col-sm-4 {
+    flex: 0 0 33.3333% !important;
+    max-width: 33.3333% !important;
+}
+#bookDetailsModal .single .col-sm-9 .row > .col-sm-8 {
+    flex: 0 0 66.6666% !important;
+    max-width: 66.6666% !important;
+}
+#bookDetailsModal .single .col-sm-9 .row > .col-sm-12 {
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+}
+
+#bookDetailsModal .scrollable-y { 
+    overflow-y: auto; 
+    scrollbar-width: thin; 
+    padding-bottom: 80px; 
+}
+#bookDetailsModal .shelf-action { 
+    text-decoration: none !important; 
+    display: block; 
+    padding: 8px 5px; 
+    color: #333; 
+    transition: background 0.2s; 
+}
+#bookDetailsModal .shelf-action:hover { 
+    background-color: #f5f5f5; 
+    border-radius: 4px; 
+}
+#bookDetailsModal .shelf-action .glyphicon { 
+    margin-right: 8px; 
+}
+#bookDetailsModal .modal-nav button:disabled {
+    opacity: 0.25 !important;
+    cursor: default !important;
+    background-color: #e0e0e0 !important;
+    border-color: #ccc !important;
+    box-shadow: none !important;
+}
+#bookDetailsModal .modal-nav button {
+    transition: all 0.2s ease;
+}
+
+/* --- DARK MODE OVERRIDES --- */
+@media (prefers-color-scheme: dark) {
+    #bookDetailsModal .single, 
+    #bookDetailsModal .single #title,
+    #bookDetailsModal .single h4[style*="color: #777"] { 
+        color: #dddddd !important; 
+    }
+    #bookDetailsModal .single .author, 
+    #bookDetailsModal .single .author a { 
+        color: #aaaaaa !important; 
+    }
+    #bookDetailsModal .single div[style*="border-bottom: 1px solid #eee"],
+    #bookDetailsModal .single div[style*="border-right: 1px solid #eee"],
+    #bookDetailsModal .single div[style*="border-left: 1px solid #eee"],
+    #bookDetailsModal .single hr {
+        border-color: #333 !important;
+    }
+    #bookDetailsModal .modal-nav button { 
+        background-color: #333 !important; 
+        border-color: #444 !important; 
+    }
+    #bookDetailsModal .modal-nav button span { 
+        color: #dddddd !important; 
+    }
+    #bookDetailsModal .modal-nav button:disabled { 
+        background-color: #222 !important; 
+        border-color: #222 !important; 
+        opacity: 0.3 !important; 
+    }
+    #bookDetailsModal .close span { 
+        color: #dddddd !important; 
+        text-shadow: none !important; 
+    }
+    #bookDetailsModal .shelf-action { 
+        color: #dddddd !important; 
+    }
+    #bookDetailsModal .shelf-action:hover { 
+        background-color: #333 !important; 
+    }
+    #bookDetailsModal .well { 
+        background-color: #1e1e1e !important; 
+        border-color: #333 !important; 
+    }
+}

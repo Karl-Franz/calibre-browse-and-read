@@ -351,6 +351,8 @@ def list_users():
     order = request.args.get("order", "").lower()
 
     if sort != "state" and order:
+        if not order in ["asc", "desc"]:
+            order = "asc"
         order = text(sort + " " + order)
     elif not state:
         order = ub.User.id.asc()
@@ -1833,6 +1835,9 @@ def _configuration_update_helper():
             services.goodreads_support.connect(config.config_goodreads_api_key,
                                                config.config_use_goodreads)
 
+        # Google Books API configuration
+        reboot_required |=_config_string(to_save, "config_googlebooks_api_key")
+        
         _config_int(to_save, "config_updatechannel")
 
         # Reverse proxy login configuration

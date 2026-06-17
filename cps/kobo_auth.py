@@ -67,7 +67,6 @@ from functools import wraps
 from flask import g, Blueprint, abort, request
 from .cw_login import login_user, current_user
 from flask_babel import gettext as _
-from flask_limiter import RateLimitExceeded
 
 from . import logger, config, calibre_db, db, helper, ub, lm, limiter
 from .render_template import render_title_template
@@ -82,6 +81,8 @@ kobo_auth = Blueprint("kobo_auth", __name__, url_prefix="/kobo_auth")
 @kobo_auth.route("/generate_auth_token/<int:user_id>")
 @user_login_required
 def generate_auth_token(user_id):
+    if current_user.id != user_id and not current_user.role_admin():
+        abort(403)
     warning = False
     host_list = request.host.rsplit(':')
     if len(host_list) == 1:
@@ -124,6 +125,8 @@ def generate_auth_token(user_id):
 @kobo_auth.route("/deleteauthtoken/<int:user_id>", methods=["POST"])
 @user_login_required
 def delete_auth_token(user_id):
+    if current_user.id != user_id and not current_user.role_admin():
+        abort(403)
     # Invalidate any previously generated Kobo Auth token for this user
     ub.session.query(ub.RemoteAuthToken).filter(ub.RemoteAuthToken.user_id == user_id)\
         .filter(ub.RemoteAuthToken.token_type==1).delete()
@@ -154,13 +157,6 @@ def requires_kobo_auth(f):
     def inner(*args, **kwargs):
         auth_token = get_auth_token()
         if auth_token is not None:
-            try:
-                limiter.check()
-            except RateLimitExceeded:
-                return abort(429)
-            except (ConnectionError, Exception) as e:
-                log.error("Connection error to limiter backend: %s", e)
-                return abort(429)
             user = (
                 ub.session.query(ub.User)
                 .join(ub.RemoteAuthToken)
@@ -169,7 +165,7 @@ def requires_kobo_auth(f):
             )
             if user is not None:
                 login_user(user)
-                [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+                [limiter.limiter.clear(limit.limit, *limit.request_args) for limit in limiter.current_limits]
                 return f(*args, **kwargs)
         log.debug("Received Kobo request without a recognizable auth token.")
         return abort(401)

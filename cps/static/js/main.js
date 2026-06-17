@@ -229,10 +229,12 @@ $("#delete_confirm").click(function(event) {
         postButton(event, getPath() + "/delete/" + deleteId + "/" + bookFormat);
     } else {
         if (ajaxResponse) {
-            path = getPath() + "/ajax/delete/" + deleteId;
             $.ajax({
-                method:"post",
-                url: path,
+                url: getPath() + "/ajax/deletebook",
+                method: "post",
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                data: JSON.stringify({"bookid": [deleteId]}),
                 timeout: 900,
                 success:function(data) {
                     data.forEach(function(item) {
@@ -408,17 +410,17 @@ $(function() {
         });
 
         // fix for infinite scroll on CaliBlur Theme (#981)
-        if ($("body").hasClass("blur")) {
-            $(".col-sm-10").bind("scroll", function () {
-                if (
-                    $(this).scrollTop() + $(this).innerHeight() >=
-                    $(this)[0].scrollHeight
-                ) {
-                    $loadMore.infiniteScroll("loadNextPage");
-                    window.history.replaceState({}, null, $loadMore.infiniteScroll("getAbsolutePath"));
-                }
-            });
-        }
+
+        $(".col-sm-10").bind("scroll", function () {
+            if (
+                $(this).scrollTop() + $(this).innerHeight() >=
+                $(this)[0].scrollHeight
+            ) {
+                $loadMore.infiniteScroll("loadNextPage");
+                window.history.replaceState({}, null, $loadMore.infiniteScroll("getAbsolutePath"));
+            }
+        });
+
     }
 
     $("#restart").click(function() {
