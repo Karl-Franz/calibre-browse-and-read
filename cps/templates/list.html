@@ -3,7 +3,9 @@
 
 {% if data == "category" %}
 <script>
-    if (localStorage.getItem('calibre_tree_view') === 'true') {
+    var treeSetting = localStorage.getItem('calibre_tree_view');
+    // If it is their first visit (null) OR they explicitly want the tree (true)
+    if (treeSetting === null || treeSetting === 'true') {
         document.documentElement.classList.add('is-tree-view');
     }
 </script>
@@ -174,27 +176,26 @@
     }
     /* ------------------------------------------------ */
 
-    /* RESPONSIVE GRID LAYOUT */
+    /* BULLETPROOF COLUMN LAYOUT */
     .list-view-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); 
-        gap: 10px; 
-        padding-bottom: 20px;
+        display: grid !important;        
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
+        gap: 10px !important;            
+        padding-bottom: 20px !important;
     }
 
-    /* FLEXBOX ITEM */
-    .list-view-grid .list-item.row {
-        display: flex; 
-        align-items: center; 
-        justify-content: space-between;
-        padding: 8px 10px;
+    .list-view-grid .list-item {
+        width: 100% !important;       /* Fills its specific grid cell */
+        max-width: 100% !important;   
+        min-width: 0 !important;      /* Allows long text to truncate properly inside the grid */
+        padding: 8px 12px !important;
         background-color: #fff;
         border: 1px solid #eee;
         border-radius: 4px;
-        height: 100%;
-        margin-left: 0;
-        margin-right: 0;
-        width: 100%; 
+        margin: 0 !important;
+        display: flex !important; 
+        align-items: center !important; 
+        justify-content: space-between !important;
     }
     
     /* FIX: Ensure hidden items actually hide in Grid mode */
@@ -284,6 +285,12 @@
         .browse-books {
             margin-top: 140px !important; 
             height: calc(100vh - 190px) !important;
+        }
+        
+        /* TREE VIEW GAP FIX: Shrink the margin when the A-Z filter header is hidden */
+        .is-tree-view .browse-books {
+            margin-top: 75px !important; 
+            height: calc(100vh - 125px) !important;
         }
     }
     /* --- ENLARGE GEAR ICON TOUCH AREA FOR IPAD --- */
@@ -421,7 +428,8 @@
         // --- TREE VIEW LOGIC ---
         {% if data == "category" %}
         
-        var isTreeMode = localStorage.getItem('calibre_tree_view') === 'true';
+        var treeSetting = localStorage.getItem('calibre_tree_view');
+        var isTreeMode = (treeSetting === null) ? true : (treeSetting === 'true');
         var treeData = null;
 
         function buildTreeData() {
@@ -567,10 +575,8 @@
             toggleView();
         });
 
-        if (isTreeMode) {
-            rebuildTree();
-            $('#tree-check').removeClass('glyphicon-unchecked').addClass('glyphicon-check');
-        }
+        // Initialize the UI to match the stored state
+        toggleView();
         
         {% endif %}
         // --- TRIGGER LOADING OVERLAY ON CATEGORY/LIST CLICKS ---
