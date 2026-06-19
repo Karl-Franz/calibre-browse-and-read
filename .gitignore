@@ -36,7 +36,7 @@ client_secrets.json
 gmail.json
 /.key
 
-# --- Calibre-Web Tablet Edition Exclusions ---
+# --- Calibre Browse and Read Exclusions ---
 
 # Personal Database Files
 app.db

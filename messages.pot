@@ -146,7 +146,7 @@ msgid "Invalid Restricted Column"
 msgstr ""
 
 #: cps/admin.py:604 cps/admin.py:1903
-msgid "Calibre-Web configuration updated"
+msgid "CB&R configuration updated"
 msgstr ""
 
 #: cps/admin.py:616
@@ -2398,7 +2398,7 @@ msgid "Logfile Configuration"
 msgstr ""
 
 #: cps/templates/config_edit.html:77
-msgid "Location and name of logfile (calibre-web.log for no entry)"
+msgid "Location and name of logfile (cbr.log for no entry)"
 msgstr ""
 
 #: cps/templates/config_edit.html:82
@@ -2406,7 +2406,7 @@ msgid "Enable Access Log"
 msgstr ""
 
 #: cps/templates/config_edit.html:85
-msgid "Location and name of access logfile (access.log for no entry)"
+msgid "Location and name of access logfile (cbr_access.log for no entry)"
 msgstr ""
 
 #: cps/templates/config_edit.html:96

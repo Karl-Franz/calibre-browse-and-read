@@ -1896,7 +1896,7 @@ def _configuration_result(error_flash=None, reboot=False):
         config.load()
         resp['result'] = [{'type': "danger", 'message': error_flash}]
     else:
-        resp['result'] = [{'type': "success", 'message': _("Calibre-Web configuration updated")}]
+        resp['result'] = [{'type': "success", 'message': _("CB&R configuration updated")}]
     resp['reboot'] = reboot
     resp['config_upload'] = config.config_upload_formats
     return make_response(jsonify(resp))
