@@ -42,9 +42,12 @@ from . import ub, db
 
 try:
     from flask_limiter import Limiter
-    limiter_present = True
+    limiter_present = False
 except ImportError:
     limiter_present = False
+
+limiter = None
+
 try:
     from flask_wtf.csrf import CSRFProtect
     wtf_present = True
@@ -110,11 +113,7 @@ web_server = WebServer()
 
 updater_thread = Updater()
 
-if limiter_present:
-    limiter = Limiter(key_func=True, headers_enabled=True, in_memory_fallback_enabled=True, default_limits=[],
-                      swallow_errors=True)
-else:
-    limiter = None
+
 
 class ScriptNameSessionInterface(SecureCookieSessionInterface):
     def get_cookie_path(self, app):
@@ -182,7 +181,7 @@ def create_app():
 
     if os.environ.get('FLASK_DEBUG'):
         cache_buster.init_cache_busting(app)
-    log.info('Starting Calibre Web...')
+    log.info('Starting Calibre Browse and Read...')
     Principal(app)
     lm.init_app(app)
     app.secret_key = os.getenv('SECRET_KEY', config_sql.get_flask_session_key(ub.session))
@@ -203,19 +202,7 @@ def create_app():
         services.goodreads_support.connect(config.config_goodreads_api_key,
                                            config.config_use_goodreads)
     config.store_calibre_uuid(calibre_db, db.Library_Id)
-    # Configure rate limiter
-    # https://limits.readthedocs.io/en/stable/storage.html
-    app.config.update(RATELIMIT_ENABLED=config.config_ratelimiter)
-    if config.config_limiter_uri != "" and not cli_param.memory_backend:
-        app.config.update(RATELIMIT_STORAGE_URI=config.config_limiter_uri)
-        if config.config_limiter_options != "":
-            app.config.update(RATELIMIT_STORAGE_OPTIONS=config.config_limiter_options)
-    try:
-        limiter.init_app(app)
-    except Exception as e:
-        log.error('Wrong Flask Limiter configuration, falling back to default: {}'.format(e))
-        app.config.update(RATELIMIT_STORAGE_URI=None)
-        limiter.init_app(app)
+    
 
     # Register scheduled tasks
     from .schedule import register_scheduled_tasks, register_startup_tasks

@@ -18,7 +18,7 @@
 
 import sys
 
-from . import create_app, limiter
+from . import create_app
 from .jinjia import jinjia
 from flask import request
 
@@ -46,7 +46,6 @@ def main():
     try:
         from .kobo import kobo, get_kobo_activated
         from .kobo_auth import kobo_auth
-        from flask_limiter.util import get_remote_address
         kobo_available = get_kobo_activated()
     except (ImportError, AttributeError):  # Catch also error for not installed flask-WTF (missing csrf decorator)
         kobo_available = False
@@ -66,7 +65,6 @@ def main():
     app.register_blueprint(tasks)
     app.register_blueprint(web)
     app.register_blueprint(basic)
-    limiter.limit("3/minute", key_func=request_username)(opds)
     app.register_blueprint(opds)
     app.register_blueprint(jinjia)
     app.register_blueprint(about)
@@ -77,7 +75,6 @@ def main():
     app.register_blueprint(gdrive)
     app.register_blueprint(editbook)
     if kobo_available:
-        limiter.limit("3/minute", key_func=get_remote_address)(kobo)
         app.register_blueprint(kobo)
         app.register_blueprint(kobo_auth)
     if oauth_available:

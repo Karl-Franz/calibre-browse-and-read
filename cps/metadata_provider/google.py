@@ -38,7 +38,7 @@ class Google(Metadata):
     BOOK_URL = "https://books.google.com/books?id="
     SEARCH_URL = "https://www.googleapis.com/books/v1/volumes?q="
     ISBN_TYPE = "ISBN_13"
-    API_KEY = "&key=" + config.config_googlebooks_api_key 
+    API_KEY = "&key=" + getattr(config, 'config_googlebooks_api_key', '') 
 
     def search(
         self, query: str, generic_cover: str = "", locale: str = "en"
