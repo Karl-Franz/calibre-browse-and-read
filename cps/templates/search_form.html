@@ -162,16 +162,15 @@
             
             <div class="row">
               <div class="form-group col-sm-6" id="tag">
-                <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                   <label for="include_tag" style="margin-bottom: 0;">{{_('Tags')}}</label>
-                  <span style="font-weight: normal; font-size: 0.85em;">
-                    <label class="radio-inline" style="padding-top: 0; margin-right: 5px;">
-                      <input type="radio" name="tag_match_mode" value="all" checked> {{_('Match ALL')}}
-                    </label>
-                    <label class="radio-inline" style="padding-top: 0;">
-                      <input type="radio" name="tag_match_mode" value="any"> {{_('Match ANY')}}
-                    </label>
-                  </span>
+                  <div class="touch-toggle-group">
+                    <input type="radio" id="match_all" name="tag_match_mode" value="all" checked>
+                    <label for="match_all">{{_('Match All')}}</label>
+                    
+                    <input type="radio" id="match_any" name="tag_match_mode" value="any">
+                    <label for="match_any">{{_('Match Any')}}</label>
+                  </div>
                 </div>
                 <select class="selectpicker" name="include_tag" id="include_tag" data-live-search="true" data-style="btn-primary" data-dropup-auto="false" data-width="100%" multiple>
                   {% for tag in tags %}
@@ -287,6 +286,53 @@
     .search-form-content {
         margin-top: 80px; 
         padding-bottom: 40px;
+    }
+
+    /* --- TOUCH-FRIENDLY SEGMENTED TOGGLE --- */
+    .touch-toggle-group {
+        display: flex;
+        background-color: #e4e4e4;
+        border-radius: 8px;
+        padding: 4px;
+        margin: 0; 
+    }
+
+    .touch-toggle-group input[type="radio"] {
+        display: none !important; 
+    }
+
+    .touch-toggle-group label {
+        flex: 1;
+        text-align: center;
+        padding: 6px 16px;
+        margin: 0;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        color: #666;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        user-select: none; 
+    }
+
+    .touch-toggle-group input[type="radio"]:checked + label {
+        background-color: #ffffff;
+        color: #45b29d; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Dark Mode Sync */
+    html.tablet-dark .touch-toggle-group { 
+        background-color: #121212; 
+        border: 1px solid #333; 
+    }
+    html.tablet-dark .touch-toggle-group label { 
+        color: #777; 
+    }
+    html.tablet-dark .touch-toggle-group input[type="radio"]:checked + label {
+        background-color: #333;
+        color: #eee;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.4);
     }
 </style>
 {% endblock %}
