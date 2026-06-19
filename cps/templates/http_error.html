@@ -11,8 +11,12 @@
     {% endif %}    
 
     <!-- Bootstrap -->
-    <link rel="apple-touch-icon" sizes="140x140" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v=20260618">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v=20260618">
+    <link rel="icon" type="image/png" sizes="96x96" href="{{ url_for('static', filename='favicon-96x96.png') }}?v=20260618">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}?v=20260618">
+    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}?v=20260618">
+    <meta name="apple-mobile-web-app-title" content="CB&R" />
     <link href="{{ url_for('static', filename='css/libs/bootstrap.min.css') }}" rel="stylesheet" media="screen">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet" media="screen">
   </head>
