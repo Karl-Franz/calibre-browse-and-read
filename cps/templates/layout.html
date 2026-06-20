@@ -14,11 +14,11 @@
     {% if g.google_site_verification|length > 0 %}
       <meta name="google-site-verification" content="{{g.google_site_verification}}">
     {% endif %}
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v=20260618">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v=20260618">
-    <link rel="icon" type="image/png" sizes="96x96" href="{{ url_for('static', filename='favicon-96x96.png') }}?v=20260618">
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}?v=20260618">
-    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}?v=20260618">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v=20260620">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v=20260620">
+    <link rel="icon" type="image/png" sizes="96x96" href="{{ url_for('static', filename='favicon-96x96.png') }}?v=20260620">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}?v=20260620">
+    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}?v=20260620">
     <meta name="apple-mobile-web-app-title" content="CB&R" />
     <link href="{{ url_for('static', filename='css/libs/bootstrap.min.css') }}" rel="stylesheet" media="screen">
     {% block header %}{% endblock %}
@@ -747,7 +747,7 @@
                   <li id="nav_{{el['id']}}" {% if page == 'hot' %}class="active"{% endif %}>
                       <a href="{{url_for(el['link'], data=el['page'], sort_param='stored')}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
                       <span class="glyphicon {{el['glyph']}}" style="margin-right: 8px; flex-shrink: 0;"></span>
-                      <span>{{_('Downloaded')}}</span>
+                      <span>{{_('Popular Downloads')}}</span>
                       </a>
                   </li>
                   {% endif %}
@@ -760,7 +760,7 @@
                       <li id="nav_{{el['id']}}" {% if page == el['page'] %}class="active"{% endif %}>
                           <a href="{{url_for(el['link'], data=el['page'], sort_param='stored')}}" style="display: flex; align-items: baseline; white-space: normal; word-wrap: break-word; padding: 5px 10px; color: #444; text-decoration: none;">
                           <span class="glyphicon {{el['glyph']}}" style="margin-right: 8px; flex-shrink: 0;"></span>
-                          <span>{{_(el['text'])}}</span>
+                          <span>{% if el['page'] == 'download' %}{{_('Individual Downloads')}}{% else %}{{_(el['text'])}}{% endif %}</span>
                           </a>
                       </li>
                   {% endif %}

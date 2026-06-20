@@ -823,7 +823,7 @@ def render_hot_books(page, order):
         num_books = entries.__len__()
         pagination = Pagination(page, config.config_books_per_page, num_books)
         return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
-                                     title=_("Hot Books (Most Downloaded)"), page="hot", order=order[1])
+                                     title=_("Popular Downloads"), page="hot", order=order[1])
     else:
         abort(404)
 
@@ -854,7 +854,7 @@ def render_downloaded_books(page, order, user_id):
                                      entries=entries,
                                      pagination=pagination,
                                      id=user_id,
-                                     title=_("Downloaded books by %(user)s", user=user.name),
+                                     title=_("Individual Downloads by %(user)s", user=user.name),
                                      page="download",
                                      order=order[1])
     else:
@@ -1383,7 +1383,7 @@ def download_list():
             .filter(ub.User.role.op('&')(constants.ROLE_ANONYMOUS) != constants.ROLE_ANONYMOUS) \
             .group_by(func.upper(func.substr(ub.User.name, 1, 1))).all()
         return render_title_template('list.html', entries=entries, folder='web.books_list', charlist=char_list,
-                                     title=_("Downloads"), page="downloadlist", data="download", order=order_no)
+                                     title=_("Individual Downloads by User"), page="downloadlist", data="download", order=order_no)
     else:
         abort(404)
 

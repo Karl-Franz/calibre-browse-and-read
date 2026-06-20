@@ -85,7 +85,15 @@
           {% if element['config_show'] %}
             <div class="col-sm-6 form-group">
               <input type="checkbox" name="show_{{element['visibility']}}" id="show_{{element['visibility']}}" {% if content.check_visibility(element['visibility']) %}checked{% endif %}>
-              <label for="show_{{element['visibility']}}">{{element['show_text']}}</label>
+              <label for="show_{{element['visibility']}}">
+                {% if 'Hot' in element['show_text'] %}
+                  {{_('Show Popular Downloads')}}
+                {% elif 'Downloaded' in element['show_text'] %}
+                  {{_('Show Individual Downloads')}}
+                {% else %}
+                  {{element['show_text']}}
+                {% endif %}
+              </label>
             </div>
           {% endif %}
         {% endfor %}
