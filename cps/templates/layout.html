@@ -47,6 +47,12 @@
             border-top: 2px solid #ccc !important;
             box-shadow: none !important;
         }
+
+        /* --- DYNAMIC THEME LOGO SWITCHER --- */
+        .logo-dark { display: none !important; }
+        html.tablet-dark .logo-light { display: none !important; }
+        html.tablet-dark .logo-dark { display: inline-block !important; }
+
         /* --- TABLET EDITION DARK MODE --- */
         html.tablet-dark {
             /* 1. Master Backgrounds (Nuclear Specificity) */
@@ -359,6 +365,42 @@
                 background-color: #1e1e1e !important;
                 border-color: #444 !important;
             }
+
+            /* 26. Range Slider Dark Mode Visibility */
+            body input[type="range"] {
+                -webkit-appearance: none !important;
+                background: transparent !important;
+                accent-color: #45b29d !important; 
+            }
+            
+            body input[type="range"]::-webkit-slider-runnable-track {
+                background-color: #555 !important;
+                height: 4px;
+                border-radius: 2px;
+            }
+            
+            body input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none !important;
+                height: 16px;
+                width: 16px;
+                background-color: #45b29d;
+                border-radius: 50%;
+                margin-top: -6px; /* Centers the 16px thumb on the 4px track */
+            }
+            
+            body input[type="range"]::-moz-range-track {
+                background-color: #555 !important;
+                height: 4px;
+                border-radius: 2px;
+            }
+            
+            body input[type="range"]::-moz-range-thumb {
+                height: 16px;
+                width: 16px;
+                background-color: #45b29d;
+                border: none;
+                border-radius: 50%;
+            }
         }
 
         /* --- GLOBAL LAYOUT & SCROLLBAR STABILIZER --- */
@@ -466,7 +508,7 @@
     <script>
         // Calibre Browse & Read: Dynamic Theme Router
         (function() {
-            var themeMode = "{{ g.current_theme | default(2) }}"; 
+            var themeMode = "{{ current_user.theme | default(2) }}"; 
             var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
             
             // If Admin chose Dark (1), OR Admin chose Auto (2) and the OS is Dark
@@ -496,8 +538,9 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <a class="navbar-brand" href="{{url_for('web.index')}}" style="padding: 5px 15px;">
-            <img src="{{ url_for('static', filename='CB&R Dark Logo.png') }}" alt="{{instance}}" style="height: 40px; width: auto; display: inline-block;">
+          <a class="navbar-brand" href="{{url_for('web.books_list', data='newest', sort_param='stored')}}" style="padding: 5px 15px;">
+            <img src="{{ url_for('static', filename='CB&R Light Logo.png') }}" alt="{{instance}}" class="logo-light" style="height: 40px; width: auto; display: inline-block;">
+            <img src="{{ url_for('static', filename='CB&R Dark Logo.png') }}" alt="{{instance}}" class="logo-dark" style="height: 40px; width: auto;">
           </a>
         </div>
         {% if g.current_theme == 1 %}

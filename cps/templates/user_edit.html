@@ -48,6 +48,15 @@
             {% endfor %}
         </select>
     </div>
+
+    <div class="form-group">
+      <label for="theme">{{_('Theme')}}</label>
+        <select name="theme" id="theme" class="form-control">
+            <option value="0" {% if content.theme == 0 %}selected{% endif %}>{{ _('Light') }}</option>
+            <option value="1" {% if content.theme == 1 %}selected{% endif %}>{{ _('Dark') }}</option>
+            <option value="2" {% if content.theme == 2 or content.theme == None %}selected{% endif %}>{{ _('Auto (OS)') }}</option>
+        </select>
+    </div>
     {% if registered_oauth.keys()| length > 0 and not new_user and profile %}
       {% for id, name in registered_oauth.items() %}
     <div class="form-group">
@@ -70,59 +79,66 @@
       <div class="btn btn-default" id="kobo_full_sync" data-value="{% if current_user.role_admin() %}{{ content.id }}{% else %}0{% endif %}" {% if not content.remote_auth_token.first() %} style="display: none;" {% endif %}>{{_('Force full kobo sync')}}</div>
     </div>
     {% endif %}
-    <div class="col-sm-6">
-    {% for element in sidebar %}
-      {% if element['config_show'] %}
-        <div class="form-group">
-          <input type="checkbox" name="show_{{element['visibility']}}" id="show_{{element['visibility']}}" {% if content.check_visibility(element['visibility']) %}checked{% endif %}>
-          <label for="show_{{element['visibility']}}">{{element['show_text']}}</label>
-        </div>
-      {% endif %}
-    {% endfor %}
-      <div class="form-group">
-          <input type="checkbox" name="Show_detail_random" id="Show_detail_random" {% if content.show_detail_random() %}checked{% endif %}>
-          <label for="Show_detail_random">{{_('Show Random Books in Detail View')}}</label>
-      </div>
-      {% if ( current_user and current_user.role_admin() and not new_user ) and not simple %}
-      <a href="#" id="get_user_tags" class="btn btn-default" data-id="{{content.id}}" data-toggle="modal" data-target="#restrictModal">{{_('Add Allowed/Denied Tags')}}</a>
-      <a href="#" id="get_user_column_values" data-id="{{content.id}}" class="btn btn-default" data-toggle="modal" data-target="#restrictModal">{{_('Add allowed/Denied Custom Column Values')}}</a>
-      {% endif %}
-    </div>
-      <div class="col-sm-6">
-    {% if current_user and current_user.role_admin() and not profile %}
-    {% if not content.role_anonymous() %}
-    <div class="form-group">
-      <input type="checkbox" name="admin_role" id="admin_role" {% if content.role_admin() %}checked{% endif %}>
-      <label for="admin_role">{{_('Admin User')}}</label>
-    </div>
-    {% endif %}
-    <div class="form-group">
-      <input type="checkbox" name="download_role" id="download_role" {% if content.role_download() %}checked{% endif %}>
-      <label for="download_role">{{_('Allow Downloads')}}</label>
-    </div>
-    <div class="form-group">
-      <input type="checkbox" name="viewer_role" id="viewer_role" {% if content.role_viewer() %}checked{% endif %}>
-      <label for="viewer_role">{{_('Allow eBook Viewer')}}</label>
-    </div>
-    {% if not content.role_anonymous() %}
-      <div class="form-group">
-        <input type="checkbox" name="passwd_role" id="passwd_role" {% if content.role_passwd() %}checked{% endif %}>
-        <label for="passwd_role">{{_('Allow Changing Password')}}</label>
-      </div>
-      <div class="form-group">
-        <input type="checkbox" name="edit_shelf_role" id="edit_shelf_role" {% if content.role_edit_shelfs() %}checked{% endif %}>
-        <label for="edit_shelf_role">{{_('Allow Editing Public Shelves')}}</label>
-      </div>
-    {% endif %}
-  {% endif %}
-    {% if kobo_support and not content.role_anonymous() and not simple%}
-    <div class="form-group">
-      <input type="checkbox" name="kobo_only_shelves_sync" id="kobo_only_shelves_sync" {% if content.kobo_only_shelves_sync %}checked{% endif %}>
-      <label for="kobo_only_shelves_sync">{{_('Sync only books in selected shelves with Kobo')}}</label>
-    </div>
-    {% endif %}
-    </div>
     <div class="col-sm-12">
+      <div class="row">
+        {% for element in sidebar %}
+          {% if element['config_show'] %}
+            <div class="col-sm-6 form-group">
+              <input type="checkbox" name="show_{{element['visibility']}}" id="show_{{element['visibility']}}" {% if content.check_visibility(element['visibility']) %}checked{% endif %}>
+              <label for="show_{{element['visibility']}}">{{element['show_text']}}</label>
+            </div>
+          {% endif %}
+        {% endfor %}
+        <div class="col-sm-6 form-group">
+            <input type="checkbox" name="Show_detail_random" id="Show_detail_random" {% if content.show_detail_random() %}checked{% endif %}>
+            <label for="Show_detail_random">{{_('Show Random Books in Detail View')}}</label>
+        </div>
+
+        {% if current_user and current_user.role_admin() and not profile %}
+          {% if not content.role_anonymous() %}
+          <div class="col-sm-6 form-group">
+            <input type="checkbox" name="admin_role" id="admin_role" {% if content.role_admin() %}checked{% endif %}>
+            <label for="admin_role">{{_('Admin User')}}</label>
+          </div>
+          {% endif %}
+          <div class="col-sm-6 form-group">
+            <input type="checkbox" name="download_role" id="download_role" {% if content.role_download() %}checked{% endif %}>
+            <label for="download_role">{{_('Allow Downloads')}}</label>
+          </div>
+          <div class="col-sm-6 form-group">
+            <input type="checkbox" name="viewer_role" id="viewer_role" {% if content.role_viewer() %}checked{% endif %}>
+            <label for="viewer_role">{{_('Allow eBook Viewer')}}</label>
+          </div>
+          {% if not content.role_anonymous() %}
+            <div class="col-sm-6 form-group">
+              <input type="checkbox" name="passwd_role" id="passwd_role" {% if content.role_passwd() %}checked{% endif %}>
+              <label for="passwd_role">{{_('Allow Changing Password')}}</label>
+            </div>
+            <div class="col-sm-6 form-group">
+              <input type="checkbox" name="edit_shelf_role" id="edit_shelf_role" {% if content.role_edit_shelfs() %}checked{% endif %}>
+              <label for="edit_shelf_role">{{_('Allow Editing Public Shelves')}}</label>
+            </div>
+          {% endif %}
+        {% endif %}
+
+        {% if kobo_support and not content.role_anonymous() and not simple%}
+        <div class="col-sm-6 form-group">
+          <input type="checkbox" name="kobo_only_shelves_sync" id="kobo_only_shelves_sync" {% if content.kobo_only_shelves_sync %}checked{% endif %}>
+          <label for="kobo_only_shelves_sync">{{_('Sync only books in selected shelves with Kobo')}}</label>
+        </div>
+        {% endif %}
+      </div>
+      
+      {% if ( current_user and current_user.role_admin() and not new_user ) and not simple %}
+      <div class="row" style="margin-top: 10px; margin-bottom: 20px;">
+          <div class="col-sm-12">
+              <a href="#" id="get_user_tags" class="btn btn-default" data-id="{{content.id}}" data-toggle="modal" data-target="#restrictModal">{{_('Add Allowed/Denied Tags')}}</a>
+              <a href="#" id="get_user_column_values" data-id="{{content.id}}" class="btn btn-default" data-toggle="modal" data-target="#restrictModal">{{_('Add allowed/Denied Custom Column Values')}}</a>
+          </div>
+      </div>
+      {% endif %}
+    </div>
+    <div class="col-sm-12 text-center" style="margin-top: 20px; margin-bottom: 30px;">
       <div id="user_submit" class="btn btn-default">{{_('Save')}}</div>
       {% if not profile %}
         <div class="btn btn-default" data-back="{{ url_for('admin.admin') }}" id="back">{{_('Cancel')}}</div>
@@ -164,4 +180,22 @@
 <script src="{{ url_for('static', filename='js/libs/pwstrength/pwstrength-bootstrap.js') }}"></script>
 <script src="{{ url_for('static', filename='js/password.js') }}"></script>
 <script src="{{ url_for('static', filename='js/table.js') }}"></script>
+<script>
+    $(document).ready(function() {
+        // Block Calibre-Web's aggressive auto-focus behavior on page load
+        var disableFocus = true;
+        
+        $('input, select').on('focus.autoFocusBlocker', function() {
+            if (disableFocus) {
+                $(this).blur();
+            }
+        });
+
+        // Drop the shield after 300ms so the user can interact normally
+        setTimeout(function() {
+            disableFocus = false;
+            $('input, select').off('focus.autoFocusBlocker');
+        }, 300);
+    });
+</script>
 {% endblock %}

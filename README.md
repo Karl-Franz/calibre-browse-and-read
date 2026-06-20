@@ -1,186 +1,187 @@
-# Calibre-Web
+# Calibre Browse & Read (CB&R)
 
-Calibre-Web is a web app that offers a clean and intuitive interface for browsing, reading, and downloading eBooks using a valid [Calibre](https://calibre-ebook.com) database.
+
+
+[toc]
+
+## About
+
+Calibre-Web is a web app that offers a clean and intuitive interface for browsing, reading, and downloading eBooks using a valid [Calibre](https://calibre-ebook.com) database. 
+
+**This specific fork (Calibre Browse & Read)** has been heavily customized and optimized for use with E-Ink displays, iPads, iPhones, modern Android e-readers and desktop browsers. It strips out legacy theme dependencies, modernizes the UI for touch interfaces, and provides native compatibility with the latest Calibre desktop database schemas.
 
 [![License](https://img.shields.io/github/license/janeczku/calibre-web?style=flat-square)](https://github.com/janeczku/calibre-web/blob/master/LICENSE)
-![Commit Activity](https://img.shields.io/github/commit-activity/w/janeczku/calibre-web?logo=github&style=flat-square&label=commits)
-[![All Releases](https://img.shields.io/github/downloads/janeczku/calibre-web/total?logo=github&style=flat-square)](https://github.com/janeczku/calibre-web/releases)
-[![PyPI](https://img.shields.io/pypi/v/calibreweb?logo=pypi&logoColor=fff&style=flat-square)](https://pypi.org/project/calibreweb/)
-[![PyPI - Downloads](https://img.shields.io/pypi/dm/calibreweb?logo=pypi&logoColor=fff&style=flat-square)](https://pypi.org/project/calibreweb/)
-[![Discord](https://img.shields.io/discord/838810113564344381?label=Discord&logo=discord&style=flat-square)](https://discord.gg/h2VsJ2NEfB)
 
-<details>
-<summary><strong>Table of Contents</strong> (click to expand)</summary>
+*This software is a fork of [Calibre-Web](https://github.com/janeczku/calibre-web) and licensed under the GPL v3 License.*
 
-1. [About](#calibre-web)
-2. [Features](#features)
-3. [Installation](#installation)
-   - [Installation via pip (recommended)](#installation-via-pip-recommended)
-   - [Quick start](#quick-start)
-   - [Requirements](#requirements)
-4. [Docker Images](#docker-images)
-5. [Troubleshooting](#troubleshooting)
-6. [Contributor Recognition](#contributor-recognition)
-7. [Contact](#contact)
-8. [Contributing to Calibre-Web](#contributing-to-calibre-web)
 
-</details>
 
-*This software is a fork of [library](https://github.com/mutschler/calibreserver) and licensed under the GPL v3 License.*
+## Background
 
-![Main screen](https://github.com/janeczku/calibre-web/wiki/images/main_screen.png)
+I started using the excellent Calibre-Web project as a front end to my 40,000+ Calibre eBook collection that I share with family and friends. However, there are some "quirks & features" of its implementation that I found difficult to deal with. Some had to do with the theme layouts of the interface.
 
-## Features
+For example, when you use the Standard (Light) Theme, the sidebar with the shelves scrolls in unison with the main content window that shows the book covers. That means that, if you want to select a different shelf, you have to scroll all the way back to the top of the web page to see them. The included "caliblur!" theme keeps the shelves stationary while the book covers scroll, however, it has a Plex Media style interface that is difficult for my non-tech savvy family members to navigate.
 
-- Modern and responsive Bootstrap 3 HTML5 interface
-- Full graphical setup
+Additionally, the built-in ePub and PDF readers (the only two formats that I support) also left a lot to be desired. Every time a user opens a book, they have to find their way back to where they left off because the reader doesn't remember it for them. There's also no way to dog-ear pages, make highlights and annotations or scroll easily through the book other than using thenext/previous page navigation. The only other option is to download the book to your device and use a separate reader applications such as the excellent **"MoonReader+"**. Again, too complicated for family and friends and also eats up local memory on their tablets for book storage.
+
+What started out as a desire to work out a few of these kinks slowly turned into a wishlist of other features that I thought would turn my customized version of Calibre-Web into my ideal combination eBook Browser/Reader. After working on it for a few months, I wondered whether others would enjoy some of these features as well, so I decided to share back to the community.
+
+## ✨ CB&R Features
+- **Calibre 9.x Native Support:** The backend SQLAlchemy models (`db.py`) have been updated to cleanly support Calibre 9.0+ schemas. Deprecated columns (`isbn`, `flags`, `lccn`) have been permanently removed to prevent 500 Internal Server Errors without requiring manual database hacking.
+- **Unified UI & OS-Aware Theming:** The legacy `caliBlur!` theme engine has been completely removed. The application now features a native, unified interface with seamless **Light**, **Dark**, and **Auto (OS-Aware)** modes.
+- **E-Ink Optimizations:** Includes a dedicated toggle for E-Ink displays that forces high-contrast monochrome rendering, disables UI animations, and sharpens container borders for crisp screen refreshes which is ideal for e-ink devices.
+- **Advanced Reader Tracking:** Custom database routing (`ub.py`) seamlessly integrates expanded reader features directly into the internal memory (`app.db`), keeping your main Calibre library pristine:
+  - Interactive 5-Star Ratings
+  - "Mark as Completed" tracking
+  - Integrated Wishlist management
+  - Persistent reading progress and custom user notes
+### Book Browser
+
+Each user has individualized display attributes that are stored in the CB&R database meaning the are portable across multiple devices they may use to browse and read. 
+
+- **Reading Progress Bars:** Each book opened will display a blue bar below the book cover indicating the position of the last page read.
+- **Smart Shelves:** After performing an Advanced Search, click on the gear icon to store the results in an existing shelf or create a dynamic `Smart Shelf` that will re-run the search each time the shelf is selected, thus showing you the most recent results on-demand.
+- **Star Ratings:** Each user can rate books independently from the Calibre database rating via the Book Details dialog.. Users can choose to have the star rating for each book shown as an overlay to the book covers via the gear icon in the book browser. A **Ratings** shelf allows users quickly find books rated by either Calibre's main database or by the user.
+- **Wishlist:** Each user can tag individual books to be added to a personalized Wishlist via the Book Details dialog. Wishlist books will display a **heart** overlay to the book covers in the book browser. Additionally, a **Wishlist** shelf will show all books in the user's Wishlist. 
+- **Mark as Completed:** Each user can tag individual books as completed via the Book Details dialog. Any book closed on the last page will also be automatically marked as Completed. Completed books will display a `Read` overlay to the book covers in the book browser. Additionally, a **Completed** shelf will show all books the user has marked as completed. 
+- **Book Series Stacks:** Users can choose to show all books that are part of a book series as a collapsed stack via an option in the gear icon in the book browser. When collapsed, clicking on a stack will show all the books in the series.
+- **Box Sets Shelf:** Anthologies and combined series books marked tagged with the keyword `Box Set` in the Calibre database get automatically added to a unique shelf in the sidebar.
+- **Add to any shelf directly from Book Details dialog:** Easily add a book to one or several shelves via a dropdown list without having to exit the Book Details dialog.
+- **Navigate to Previous/Next book details:** Buttons above the book cover in the Book Details dialog allow the user to navigate to the next or previous book without needing to close Book Details dialog box between each book.
+- **Currently Reading List:** Any book that is open is automatically added to a `Currently Reading` list. This list is always shown in side-scrolling list at top of each Book Browser page.  Additionally, a `Currently Reading` shelf will show all books the user has recently open sorted from most recent to least recent. Clicking on the gear icon allows user to remove books from this list.
+- **Bulk Editing of Shelves:** Clicking on the gear icon and selecting Bulk Edit while viewing a shelf allows users to quickly mark multiple books for:
+   - Removing from a shelf
+   - Moving to another shelf
+   - Copying to another shelf
+   - Adding to the user's Wishlist.
+   - Tagging as completed
+- **Resizeable Book Cover Grid:** Use the slider in the top bar to show more or less book covers per screenful.
+
+- **Hierchical Categories:** Books tagged in calibre using the hierarchical dot-notation (Category.Sub-Category.Sub-Sub-Category) can be displayed in a collapsible tree-view via an option in the Categories Page's gear icon.
+
+### Book Reader
+- **Automatically switch to two-page spread on landscape mode** [^1]
+- **Force single-page view in landscape mode** [^1]
+- **Single page for cover in two-page spread** [^1]
+- **Bookmarking:** Dog-ear pages you might want to go back to
+- **Highlighting:** Select and underline text in one of 4 colors
+- **Create annotation text for each highlight**
+- **Bookmark and Highlight Navigation**
+- **Scrub Bar Navigation:** 
+   - Slider to quickly move through book contents
+   - Colored round markers to indicate location of colored highlights in text
+   - Tick marks to show position of bookmarks in text
+   - Start & End navigation buttons
+   - Previous & Next Bookmark/Annotation navigation buttons
+- **Table of Contents:** Navigation for eBooks that support it
+- **Themes:**
+   - Auto (OS Setting)
+   - Light
+   - Sepia
+   - Slate (low contrast)
+   - Dark
+- Last position, Bookmarks, Highhlights and Annotations are stored in central database so they remain visible even if you switch to a different device.
+
+[^1]: This option is saved individually for each book.
+
+   #### ePub Reader
+   The improved eReader for ePub files includes options to customize:
+   - Font family
+      - Publisher Default 
+      - Arial
+      - Georgia
+      - Times New Roman
+      - Verdana
+      - Trebuchet MS
+      - Courier
+      - Comic Sans
+   - Font size increase/decrease
+   - Word spacing increase/decrease
+   - Line spacing increase/decrease
+   - Paragraph spacing increase/decrease
+   - Left and Right margin size increase/decrease
+   - Bold first word of every sentence 
+
+#### PDF Reader
+
+- **Hardware-Accelerated Pan & Zoom Lock:** Maximize your screen real estate by cropping out large white margins. Unlock the viewport, zoom and pan the PDF exactly where you want it, and lock it. The reader will persistently apply your custom crop to every page you turn. Double-tap the Zoom-Lock icon at any time to restore the default size. [^1]
+- **Intelligent Theme Inversion:** The Light, Sepia, Slate, and Dark themes don't just change the UI—they mathematically invert, color-shift, and contrast-adjust the actual PDF canvas for comfortable nighttime reading without destroying the page layout. (for true PDF files only. Not for scanned PDFs)
+- **Dynamic Page Layouts:** Choose between Single-Page view, Book Spread (cover on its own page), or Continuous Spread layouts. Includes a master toggle to instantly force single-page layouts on landscape screens; handy for use with PDFs that were scanned as double page spreads.
+- **Visual Grid Navigation:** A dedicated "Pages" tab generates a grid of book thumbnails. To save device memory, these thumbnails lazy-load only when you scroll to them. The grid actively highlights your current page or two-page spread as you read.
+- **Customizable Touch Controls:** Choose between invisible edge-tap zones for distraction-free E-ink reading, or floating hardware-style buttons for ease of use on desktop browsers and to prevent page turn zones from interfering with text highlighting.
+- **Options Stored Per-Book:** Your custom zoom-lock crop coordinates, layout preferences, and theme overrides are seamlessly saved to your browser and remembered individually for every single PDF in your library.
+
+
+## Standard Calibre-Web Features
+
+- Modern and responsive HTML5 interface
 - Comprehensive user management with fine-grained per-user permissions
-- Admin interface
-- Multilingual user interface supporting 20+ languages ([supported languages](https://github.com/janeczku/calibre-web/wiki/Translation-Status))
+- Multilingual user interface supporting 20+ languages
 - OPDS feed for eBook reader apps
 - Advanced search and filtering options
 - Custom book collection (shelves) creation
 - eBook metadata editing and deletion support
-- Metadata download from various sources (extensible via plugins)
 - eBook conversion through Calibre binaries
 - eBook download restriction to logged-in users
 - Public user registration support
-- Send eBooks to E-Readers with a single click
 - Sync Kobo devices with your Calibre library
 - In-browser eBook reading support for multiple formats
-- Upload new books in various formats, including audio formats
-- Calibre Custom Columns support
+- Upload new books in various formats
 - Content hiding based on categories and Custom Column content per user
-- Self-update capability
-- "Magic Link" login for easy access on eReaders
-- LDAP, Google/GitHub OAuth, and proxy authentication support
 
 ## Installation
 
 ### Installation via pip (recommended)
 
-1. **Create a virtual environment**: It’s essential to isolate your Calibre-Web installation to avoid dependency conflicts. You can create a virtual environment by running:
-   ```
-   python3 -m venv calibre-web-env
+1. **Create a virtual environment:** It’s essential to isolate your Calibre-Web installation to avoid dependency conflicts. You can create a virtual environment by running:
+    ```
+   python3 -m venv cbr
    ```
 2. **Activate the virtual environment**:
    ```
-   source calibre-web-env/bin/activate
+   source cbr/bin/activate
    ```
-3. **Install Calibre-Web**: Use pip to install the application:
+3. **Install dependencies:** Use pip to install the required packages:
    ```
-   pip install calibreweb
+   pip install -r requirements.txt
    ```
-4. **Install optional features**: For additional functionality, you may need to install optional features. Refer to [this page](https://github.com/janeczku/calibre-web/wiki/Dependencies-in-Calibre-Web-Linux-and-Windows) for details on what can be installed.
-5. **Start Calibre-Web**: After installation, you can start the application with:
+4. **Start Calibre-Web:** After installation, you can start the application with:
    ```
-   cps
+   python cps.py
    ```
-
-*Note: Users of Raspberry Pi OS may encounter installation issues. If you do, try upgrading pip and/or installing cargo as follows:*
-   ```
-   ./venv/bin/python3 -m pip install --upgrade pip
-   sudo apt install cargo
-   ```
-
-### Important Links
-- For additional installation examples, check the following:
-   - [Manual installation](https://github.com/janeczku/calibre-web/wiki/Manual-installation)
-   - [Linux Mint installation](https://github.com/janeczku/calibre-web/wiki/How-To:-Install-Calibre-Web-in-Linux-Mint-19-or-20)
-   - [Cloud Provider setup](https://github.com/janeczku/calibre-web/wiki/How-To:-Install-Calibre-Web-on-a-Cloud-Provider)
 
 ## Quick Start
-
-1. **Access Calibre-Web**: Open your browser and navigate to:
+Access Calibre-Web: Open your browser and navigate to:
    ```
    http://localhost:8083
    ```
-   or for the OPDS catalog:
-   ```
-   http://localhost:8083/opds
-   ```
-2. **Log in**: Use the default admin credentials:
+1. **Log in: Use the default admin credentials:**
+
    - **Username:** admin
    - **Password:** admin123
-3. **Database Setup**: If you do not have a Calibre database, download a sample from:
-   ```
-   https://github.com/janeczku/calibre-web/raw/master/library/metadata.db
-   ```
-   Move it out of the Calibre-Web folder to avoid overwriting during updates.
-4. **Configure Calibre Database**: In the admin interface, set the `Location of Calibre database` to the path of the folder containing your Calibre library (where `metadata.db` is located) and click "Save".
-5. **Google Drive Integration**: For hosting your Calibre library on Google Drive, refer to the [Google Drive integration guide](https://github.com/janeczku/calibre-web/wiki/G-Drive-Setup#using-google-drive-integration).
-6. **Admin Configuration**: Configure your instance via the admin page, referring to the [Basic Configuration](https://github.com/janeczku/calibre-web/wiki/Configuration#basic-configuration) and [UI Configuration](https://github.com/janeczku/calibre-web/wiki/Configuration#ui-configuration) guides.
-
+2. **Configure Calibre Database:** In the admin interface, set the Location of Calibre database to the path of the folder containing your Calibre library (where metadata.db is located) and click "Save".
 ## Requirements
+- **Python Version:** Ensure you have Python 3.7 or newer.
+- **Imagemagick:** Required for cover extraction from EPUBs.
+- **Optional Tools:**
+   - **Calibre desktop program:** Recommended for on-the-fly conversion and metadata editing. Set the path to Calibre’s converter tool on the setup page.
+   - **Kepubify tool:** Needed for Kobo device support.
+   - **jQuery:** v3.5.1
+   - **Isotope:** v3.0.6
+   - **PDF.js:** v2.16.105 (Modified for Zoom Lock)
 
-- **Python Version**: Ensure you have Python 3.7 or newer.
-- **Imagemagick**: Required for cover extraction from EPUBs. Windows users may also need to install [Ghostscript](https://ghostscript.com/releases/gsdnld.html) for PDF cover extraction.
-- **Optional Tools**:
-   - **Calibre desktop program**: Recommended for on-the-fly conversion and metadata editing. Set the path to Calibre’s converter tool on the setup page.
-   - **Kepubify tool**: Needed for Kobo device support. Download the tool and place the binary in `/opt/kepubify` on Linux or `C:\Program Files\kepubify` on Windows.
+## Limitations
 
-## Docker Images
+- The main limitation of this version is that it is strictly a "connected" application meaning that it requires you to be online while reading to track your progress, make annotations, etc. You can always download the book and use a different reader if you prefer, but that defeats the purpose.
 
-Pre-built Docker images are available:
+- Only ePub and PDF formats use the integrated reader environment because those are the only two formats I use in my own library. I haven't touched the other readers included with Calibre-Web so I don't know how they work.
 
-### **LinuxServer - x64, aarch64**
-- **Docker Hub**: [linuxserver/calibre-web](https://hub.docker.com/r/linuxserver/calibre-web)
-- **GitHub**: [linuxserver/docker-calibre-web](https://github.com/linuxserver/docker-calibre-web)
-- **Optional Calibre layer**: [linuxserver/docker-mods](https://github.com/linuxserver/docker-mods/tree/universal-calibre)
+- CB&R does not intend to replicate functionality that is best handled by the Calibre application itself. As such, any features that modify the main Calibre library database have been stripped out. If your goal is to remotely add/delete books, change metadata (such as: title, author, description, tags, or series) or modify/add book covers either do this via the main Calibre app or CB&R is not for you.
+  
 
-To include the Calibre `ebook-convert` binary (x64 only), add the environment variable:
-``` 
-DOCKER_MODS=linuxserver/mods:universal-calibre
-```
-in your Docker run/compose file. Omit this variable for a lightweight image.
+## Acknowledgements
 
-- **Paths Configuration**:
-   - Set **Path to Calibre Binaries** to `/usr/bin`.
-   - Set **Path to Unrar** to `/usr/bin/unrar`.
+This code was mostly modified thanks to my trusty assistant Gemini under my direction. I'm very impressed with the results, but I cannot vouch for the efficiency or "correctness" of the code. I was a Pascal, BASIC, C, C++ and 6502 & 68000 Assembly developer in another life, but all these new-fangled web technologies are not my forté. 
 
-## Troubleshooting
+**Thank you for considering CB&R!**
 
-- **Common Issues**: 
-   - If you experience issues starting the application, check the log files located in the `logs` directory for error messages.
-   - If eBooks fail to load, verify that the `Location of Calibre database` is correctly set and that the database file is accessible.
-
-- **Configuration Errors**: Ensure that your Calibre database is compatible and properly formatted. Refer to the Calibre documentation for guidance on maintaining the database.
-
-- **Performance Problems**: 
-   - If the application is slow, consider increasing the allocated resources (CPU/RAM) to your server or optimizing the Calibre database by removing duplicates and unnecessary entries.
-   - Regularly clear the cache in your web browser to improve loading times.
-
-- **User Management Issues**: If users are unable to log in or register, check the user permission settings in the admin interface. Ensure that registration is enabled and that users are being assigned appropriate roles.
-
-- **Support Resources**: For additional help, consider visiting the [FAQ section](https://github.com/janeczku/calibre-web/wiki/FAQ) of the wiki or posting your questions in the [Discord community](https://discord.gg/h2VsJ2NEfB).
-
-## Contributor Recognition
-
-We would like to thank all the [contributors](https://github.com/janeczku/calibre-web/graphs/contributors) and maintainers of Calibre-Web for their valuable input and dedication to the project. Your contributions are greatly appreciated.
-
-## Contact
-
-Join us on [Discord](https://discord.gg/h2VsJ2NEfB)
-
-For more information, How To's, and FAQs, please visit the [Wiki](https://github.com/janeczku/calibre-web/wiki)
-
-## Contributing to Calibre-Web
-
-To contribute, please check our [Contributing Guidelines](https://github.com/janeczku/calibre-web/blob/master/CONTRIBUTING.md). We welcome issues, feature requests, and pull requests from the community.
-
-### Reporting Bugs
-
-If you encounter bugs or issues, please report them in the [issues section](https://github.com/janeczku/calibre-web/issues) of the repository. Be sure to include detailed information about your setup and the problem encountered.
-
-### Feature Requests
-
-We welcome suggestions for new features. Please create a new issue in the repository to discuss your ideas.
-
-## Additional Resources
-
-- **Documentation**: Comprehensive documentation is available on the [Calibre-Web wiki](https://github.com/janeczku/calibre-web/wiki).
-- **Community Contributions**: Explore the [community contributions](https://github.com/janeczku/calibre-web/pulls) to see ongoing work and how you can get involved.
-
----
-
-Thank you for using Calibre-Web! We hope you enjoy managing your eBook library with our tool.

@@ -257,6 +257,7 @@ class User(UserBase, Base):
     remote_auth_token = relationship('RemoteAuthToken', backref='user', lazy='dynamic')
     view_settings = Column(JSON, default={})
     kobo_only_shelves_sync = Column(Integer, default=0)
+    theme = Column(Integer, default=2)
 
 
 if oauth_support:
@@ -280,6 +281,7 @@ class OAuthProvider(Base):
 # anonymous user
 class Anonymous(AnonymousUserMixin, UserBase):
     def __init__(self):
+        self.theme = None
         self.kobo_only_shelves_sync = None
         self.view_settings = None
         self.allowed_column_value = None
@@ -310,6 +312,7 @@ class Anonymous(AnonymousUserMixin, UserBase):
         self.allowed_column_value = data.allowed_column_value
         self.view_settings = data.view_settings
         self.kobo_only_shelves_sync = data.kobo_only_shelves_sync
+        self.theme = data.theme
 
     def role_admin(self):
         return False
@@ -623,6 +626,19 @@ def migrate_registration_table(engine, _session):
 def migrate_shelf_table(engine, _session):
     pass # Column manually added via DB Browser
 
+def migrate_user_table(engine, _session):
+    try:
+        # Use the already-open session to avoid SQLite locking collisions
+        res = _session.execute(text("PRAGMA table_info(user)"))
+        columns = [row[1] for row in res]
+        if 'theme' not in columns:
+            _session.execute(text("ALTER TABLE user ADD COLUMN theme INTEGER DEFAULT 2"))
+            _session.commit()
+            log.info("Database Migration: Added 'theme' column to 'user' table.")
+    except Exception as e:
+        _session.rollback()
+        log.error("Failed to migrate user table: {}".format(e))
+
 # Migrate database to current version, has to be updated after every database change. Currently, migration from
 # maybe 4/5 versions back to current should work.
 # Migration is done by checking if relevant columns are existing, and then adding rows with SQL commands
@@ -631,6 +647,7 @@ def migrate_Database(_session):
     add_missing_tables(engine, _session)
     migrate_registration_table(engine, _session)
     migrate_shelf_table(engine, _session)
+    migrate_user_table(engine, _session)
 
 
 def clean_database(_session):

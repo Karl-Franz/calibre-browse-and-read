@@ -1927,6 +1927,8 @@ def change_profile(kobo_support, local_oauth_check, oauth_status, translations, 
         current_user.random_books = 1 if to_save.get("show_random") == "on" else 0
         current_user.default_language = to_save.get("default_language", "all")
         current_user.locale = to_save.get("locale", "en")
+        if "theme" in to_save:
+            current_user.theme = int(to_save.get("theme", 2))
         old_state = current_user.kobo_only_shelves_sync
         current_user.kobo_only_shelves_sync = int(to_save.get("kobo_only_shelves_sync") == "on") or 0
         if old_state == 0 and current_user.kobo_only_shelves_sync == 1:
