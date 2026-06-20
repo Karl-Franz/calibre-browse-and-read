@@ -496,7 +496,9 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <a class="navbar-brand" href="{{url_for('web.index')}}">{{instance}}</a>
+          <a class="navbar-brand" href="{{url_for('web.index')}}" style="padding: 5px 15px;">
+            <img src="{{ url_for('static', filename='CB&R Dark Logo.png') }}" alt="{{instance}}" style="height: 40px; width: auto; display: inline-block;">
+          </a>
         </div>
         {% if g.current_theme == 1 %}
             <div class="home-btn"><a class="home-btn-tooltip" href="{{url_for("web.index", page=1)}}" data-toggle="tooltip" title="" data-placement="bottom" data-original-title="Home"></a></div>
