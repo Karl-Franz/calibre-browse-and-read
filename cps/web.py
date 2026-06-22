@@ -1642,6 +1642,15 @@ def get_robots():
         log.error("No permission to access robots.txt file.")
         abort(403)
 
+@web.route("/apple-touch-icon.png")
+@web.route("/apple-touch-icon-precomposed.png")
+def get_apple_touch_icon():
+    try:
+        return send_from_directory(constants.STATIC_DIR, "cbr-ios-icon.png", mimetype='image/png')
+    except PermissionError:
+        log.error("No permission to access iOS file.")
+        abort(403)
+
 
 @web.route("/show/<int:book_id>/<book_format>", defaults={'anyname': 'None'})
 @web.route("/show/<int:book_id>/<book_format>/<anyname>")
