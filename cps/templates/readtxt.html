@@ -6,19 +6,14 @@
         <title>{{_('txt Reader')}} | {{title}}</title>
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, user-scalable=no">
-        <meta name="mobile-web-app-capable" content="yes">
         {% if g.google_site_verification|length > 0 %}
           <meta name="google-site-verification" content="{{g.google_site_verification}}">
         {% endif %}  
 
-        <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v=20260621">
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v=20260621">
         <link rel="icon" type="image/png" sizes="96x96" href="{{ url_for('static', filename='favicon-96x96.png') }}?v=20260621">
         <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}?v=20260621">
-        <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}?v=20260621">
-        <meta name="apple-mobile-web-app-title" content="CB&R" />
-        
-
+      
         <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" type="text/css"/>
         <link rel="stylesheet" href="{{ url_for('static', filename='css/text.css') }}" type="text/css"/>
 

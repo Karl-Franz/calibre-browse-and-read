@@ -1,22 +1,19 @@
 <!DOCTYPE html>
 <html class="http-error">
-  <head>
+ <head>
     <title>{{ instance }} | HTTP Error ({{ error_code }})</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <meta name="apple-mobile-web-app-capable" content="yes">
     {% if g.google_site_verification|length > 0 %}
       <meta name="google-site-verification" content="{{g.google_site_verification}}">
     {% endif %}    
 
-    <!-- Bootstrap -->
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v=20260621">
+    <!-- Standard Browser Tab Icons Only -->
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v=20260621">
     <link rel="icon" type="image/png" sizes="96x96" href="{{ url_for('static', filename='favicon-96x96.png') }}?v=20260621">
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}?v=20260621">
-    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}?v=20260621">
-    <meta name="apple-mobile-web-app-title" content="CB&R" />
+    
     <link href="{{ url_for('static', filename='css/libs/bootstrap.min.css') }}" rel="stylesheet" media="screen">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet" media="screen">
   </head>
