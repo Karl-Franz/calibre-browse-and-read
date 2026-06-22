@@ -87,7 +87,7 @@
               <input type="checkbox" name="show_{{element['visibility']}}" id="show_{{element['visibility']}}" {% if content.check_visibility(element['visibility']) %}checked{% endif %}>
               <label for="show_{{element['visibility']}}">
                 {% if 'Hot' in element['show_text'] %}
-                  {{_('Show Popular Downloads')}}
+                  {{_('Show Popular Reading')}}
                 {% elif 'Downloaded' in element['show_text'] %}
                   {{_('Show Individual Downloads')}}
                 {% else %}
@@ -100,6 +100,10 @@
         <div class="col-sm-6 form-group">
             <input type="checkbox" name="Show_detail_random" id="Show_detail_random" {% if content.show_detail_random() %}checked{% endif %}>
             <label for="Show_detail_random">{{_('Show Random Books in Detail View')}}</label>
+        </div>
+        <div class="col-sm-6 form-group">
+            <input type="checkbox" name="hide_reading" id="hide_reading" {% if content.get_view_property('privacy', 'hide_reading') %}checked{% endif %}>
+            <label for="hide_reading">{{_('Keep Reading Activity Private')}}</label>
         </div>
 
         {% if current_user and current_user.role_admin() and not profile %}

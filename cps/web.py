@@ -722,7 +722,7 @@ def render_rated_books(page, book_id, order):
     if current_user.check_visibility(constants.SIDEBAR_BEST_RATED):
         
         series_first = request.cookies.get('cw_series_first') == '1'
-        stack = request.cookies.get('cw_stack_series', '1') == '1'
+        stack = False  # Disabled: Books in a series can have different ratings
 
         if series_first:
             sort_order = [db.Series.name == None, db.Series.name, db.Books.series_index] + list(order[0])
@@ -797,8 +797,14 @@ def render_boxsets_books(page, order):
     
 def render_hot_books(page, order):
     if current_user.check_visibility(constants.SIDEBAR_HOT):
-        if order[1] not in ['hotasc', 'hotdesc']:
-            order = [func.count(ub.Downloads.book_id).desc()], 'hotdesc'
+        
+        # 1. Override default sorting (since default relies on the old Downloads table)
+        if order[1] == 'hotasc':
+            actual_order = [func.count(ub.KoboReadingState.book_id).asc()]
+        else:
+            actual_order = [func.count(ub.KoboReadingState.book_id).desc()]
+            order = actual_order, 'hotdesc'
+
         if current_user.show_detail_random():
             random_query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
             random = (random_query.filter(calibre_db.common_filters())
@@ -808,22 +814,39 @@ def render_hot_books(page, order):
             random = false()
 
         off = int(int(config.config_books_per_page) * (page - 1))
-        all_books = ub.session.query(ub.Downloads, func.count(ub.Downloads.book_id)) \
-            .order_by(*order[0]).group_by(ub.Downloads.book_id)
-        hot_books = all_books.offset(off).limit(config.config_books_per_page)
+
+        # 2. PRIVACY FILTER: Find users who opted out of sharing
+        all_users = ub.session.query(ub.User).all()
+        opted_out_users = [u.id for u in all_users if u.get_view_property('privacy', 'hide_reading') == True]
+
+        # 3. GLOBAL READING QUERY: Count readers per book, excluding private users
+        query = ub.session.query(ub.KoboReadingState.book_id, func.count(ub.KoboReadingState.book_id).label('readers'))
+        if opted_out_users:
+            query = query.filter(not_(ub.KoboReadingState.user_id.in_(opted_out_users)))
+
+        all_books = query.group_by(ub.KoboReadingState.book_id).order_by(*actual_order)
+        hot_books = all_books.offset(off).limit(config.config_books_per_page).all()
+
         entries = list()
-        for book in hot_books:
-            query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
-            download_book = query.filter(calibre_db.common_filters()).filter(
-                book.Downloads.book_id == db.Books.id).first()
-            if download_book:
-                entries.append(download_book)
-            else:
-                ub.delete_download(book.Downloads.book_id)
-        num_books = entries.__len__()
-        pagination = Pagination(page, config.config_books_per_page, num_books)
+        for book_id, reader_count in hot_books:
+            book_query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
+            active_book = book_query.filter(calibre_db.common_filters()).filter(db.Books.id == book_id).first()
+            if active_book:
+                # Extract the mutable db.Books instance from the SQLAlchemy Row tuple
+                book_instance = active_book.Books if hasattr(active_book, 'Books') else (active_book[0] if isinstance(active_book, tuple) else active_book)
+                book_instance.reader_count = reader_count
+                entries.append(active_book)
+
+        # 4. Pagination math based on unique active books
+        total_query = ub.session.query(ub.KoboReadingState.book_id)
+        if opted_out_users:
+             total_query = total_query.filter(not_(ub.KoboReadingState.user_id.in_(opted_out_users)))
+        total_count = total_query.distinct().count()
+
+        pagination = Pagination(page, config.config_books_per_page, total_count)
+
         return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
-                                     title=_("Popular Downloads"), page="hot", order=order[1])
+                                     title=_("What Others Are Reading"), page="hot", order=order[1])
     else:
         abort(404)
 
@@ -1942,6 +1965,10 @@ def change_profile(kobo_support, local_oauth_check, oauth_status, translations, 
         current_user.kobo_only_shelves_sync = int(to_save.get("kobo_only_shelves_sync") == "on") or 0
         if old_state == 0 and current_user.kobo_only_shelves_sync == 1:
             kobo_sync_status.update_on_sync_shelfs(current_user.id)
+
+        # --- CB&R Privacy Toggle ---
+        hide_reading_status = to_save.get("hide_reading") == "on"
+        current_user.set_view_property('privacy', 'hide_reading', hide_reading_status)
 
     except Exception as ex:
         flash(str(ex), category="error")

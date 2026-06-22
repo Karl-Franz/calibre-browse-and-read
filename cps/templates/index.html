@@ -27,16 +27,15 @@
                     <span class="glyphicon glyphicon-check" style="margin-right: 5px; color: #5cb85c;"></span> {{_('Bulk Edit')}}
                 </a></li>
             {% else %}
-                <li class="dropdown-header">{{_('Sort By')}}</li>
-                
                 {% if page == 'hot' %}
-                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='hotasc')}}">
-                      <span class="glyphicon glyphicon-ok" {% if order != 'hotasc' %}style="visibility:hidden;"{% endif %}></span> {{_('Downloads (Low to High)')}}
-                  </a></li>
-                  <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='hotdesc')}}">
-                      <span class="glyphicon glyphicon-ok" {% if order != 'hotdesc' %}style="visibility:hidden;"{% endif %}></span> {{_('Downloads (High to Low)')}}
-                  </a></li>
+                <li class="dropdown-header">{{_('View Modifiers')}}</li>
+                  <li>
+                      <a href="#" id="toggle-reader-count">
+                          <span class="glyphicon glyphicon-{% if request.cookies.get('cw_show_reader_count', '1') == '1' %}check{% else %}unchecked{% endif %}"></span> {{_('Show Reader Count Badge')}}
+                      </a>
+                  </li>
                 {% else %}
+                <li class="dropdown-header">{{_('Sort By')}}</li>
                   <li><a href="{{url_for('web.books_list', data=page, book_id=id, sort_param='new')}}">
                       <span class="glyphicon glyphicon-ok" {% if order != 'new' and order != 'stored' %}style="visibility:hidden;"{% endif %}></span> {{_('Date Added (Newest)')}}
                   </a></li>
@@ -88,11 +87,13 @@
                         <span class="glyphicon glyphicon-{% if request.cookies.get('cw_series_first') == '1' %}check{% else %}unchecked{% endif %}"></span> {{_('Series First')}}
                     </a>
                 </li>
+                {% if page not in ['rated'] %}
                 <li>
                     <a href="#" id="toggle-stack-series">
                         <span class="glyphicon glyphicon-{% if request.cookies.get('cw_stack_series', '1') == '1' %}check{% else %}unchecked{% endif %}"></span> {{_('Stack Series')}}
                     </a>
                 </li>
+                {% endif %}
                 {% endif %}
             {% endif %}
         </ul>
@@ -364,7 +365,7 @@
         
        {% set current_book_id = entry.Books.id if entry.Books else (entry[0].id if entry[0] else entry.id) %}
        {% set current_book = entry.Books if entry.Books else (entry[0] if entry[0] else entry) %}
-       {% set disable_stack = (page in ['series', 'discover', 'boxsets', 'currently_reading']) %}
+       {% set disable_stack = (page in ['series', 'discover', 'boxsets', 'currently_reading', 'hot', 'rated', 'ratings', 'user_ratings']) %}
        
        {% set is_read = false %}
         {% set check_id = current_book_id if current_book_id is defined else (book.id if book is defined else 0) %}
@@ -386,6 +387,13 @@
              {% endif %}
        >
           <div class="cover {% if is_read %}read-book-dimmed{% endif %}" data-book-id="{{ current_book_id }}">
+              
+              {% if page == 'hot' and current_book.reader_count is defined and request.cookies.get('cw_show_reader_count', '1') == '1' %}
+                  <div class="reader-count-pill" style="position:absolute; top:-8px; right:-8px; background:#d9534f; color:#fff; font-size:12px; padding:3px 7px; border-radius:12px; font-weight:bold; z-index:20; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                      <span class="glyphicon glyphicon-user" style="margin-right:4px;"></span>{{ current_book.reader_count }}
+                  </div>
+              {% endif %}
+
               <a href="{{ url_for('web.show_book', book_id=current_book_id) }}" {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}>
                 <span class="img" title="{{ current_book.title }}">
                   {{ image.book_cover(current_book) }}
@@ -856,8 +864,16 @@
             window.location.reload();
         });
 
+        $('#toggle-reader-count').click(function(e) {
+            e.preventDefault();
+            var current = getCookie('cw_show_reader_count');
+            var nextState = (current === null || current === '1') ? '0' : '1';
+            setCookie('cw_show_reader_count', nextState, 365);
+            window.location.reload();
+        });
+
         // Disabled ONLY on specific pages like ratings, but active everywhere else
-        var isStackMode = {{ 'true' if request.cookies.get('cw_stack_series', '1') == '1' and page not in ['series', 'discover', 'boxsets', 'currently_reading', 'ratings', 'user_ratings'] else 'false' }};
+        var isStackMode = {{ 'true' if request.cookies.get('cw_stack_series', '1') == '1' and page not in ['series', 'discover', 'boxsets', 'currently_reading', 'ratings', 'user_ratings', 'hot', 'rated'] else 'false' }};
         
         if (isStackMode) {
             $('.book.session').each(function() {
