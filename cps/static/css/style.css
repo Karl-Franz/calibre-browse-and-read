@@ -1049,4 +1049,14 @@ body.index {
         background-color: #1e1e1e !important; 
         border-color: #333 !important; 
     }
+
+    body .rating .glyphicon-star.good,
+    body .glyphicon-star.good,
+    body .glyphicon-star {
+        color: #dddddd !important; 
+    }
+    body .rating .glyphicon-star-empty,
+    body .glyphicon-star-empty {
+        color: #555555 !important;
+    }
 }

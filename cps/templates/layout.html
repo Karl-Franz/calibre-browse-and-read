@@ -57,7 +57,7 @@
         html.tablet-dark .logo-light { display: none !important; }
         html.tablet-dark .logo-dark { display: inline-block !important; }
 
-        /* --- TABLET EDITION DARK MODE --- */
+        /* --- DYNAMIC DARK MODE THEME --- */
         html.tablet-dark {
             /* 1. Master Backgrounds (Nuclear Specificity) */
             html, body, body div.col-sm-2:has(nav.navigation), body .navbar, 
@@ -404,6 +404,17 @@
                 background-color: #45b29d;
                 border: none;
                 border-radius: 50%;
+            }
+
+            /* 27. Rating Stars */
+            body .rating .glyphicon-star.good,
+            body .glyphicon-star.good,
+            body .glyphicon-star {
+                color: #dddddd !important; /* White/Light-Grey */
+            }
+            body .rating .glyphicon-star-empty,
+            body .glyphicon-star-empty {
+                color: #555555 !important; /* Muted grey */
             }
         }
 
