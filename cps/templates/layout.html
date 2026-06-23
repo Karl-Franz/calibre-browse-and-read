@@ -568,6 +568,32 @@
         $(window).on('pageshow', function(event) {
             $('#pagination-loading-overlay').css('display', 'none');
         });
+
+        // --- BULLETPROOF MODAL NAVIGATION ---
+        // Computes the exact, isolated list of books at the moment of click
+        $(document).on('click', '.cover a[data-toggle="modal"]', function(e) {
+            // Find the most immediate wrapper (isolates the scroller from the main grid)
+            var $container = $(this).closest('.carousel-inner, .swiper-wrapper, .scroller, .cr-scroller, .row, [id*="carousel"]').first();
+            
+            var ids = [];
+            var urls = [];
+            
+            $container.find('a[data-toggle="modal"]').each(function() {
+                // Ignore cloned elements in infinite carousels to prevent duplicates
+                if ($(this).closest('.clone, .swiper-slide-duplicate').length === 0) {
+                    var $wrapper = $(this).closest('[data-book-id]'); // Climb tree to find the ID
+                    if ($wrapper.length > 0) {
+                        var id = parseInt($wrapper.data('book-id'));
+                        if (!isNaN(id) && ids.indexOf(id) === -1) {
+                            ids.push(id);
+                            urls.push($(this).attr('href'));
+                        }
+                    }
+                }
+            });
+            
+            window.currentModalGallery = { ids: ids, urls: urls };
+        });
     </script>
   </body>
 </html>

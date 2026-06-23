@@ -1023,17 +1023,32 @@ body.index {
     #bookDetailsModal .single hr {
         border-color: #333 !important;
     }
-    #bookDetailsModal .modal-nav button { 
+    #bookDetailsModal .modal-nav button,
+    #prev-book-btn,
+    #next-book-btn { 
         background-color: #333 !important; 
         border-color: #444 !important; 
+        color: #dddddd !important;
+        text-shadow: none !important;
     }
-    #bookDetailsModal .modal-nav button span { 
+    #bookDetailsModal .modal-nav button span,
+    #prev-book-btn span,
+    #next-book-btn span { 
         color: #dddddd !important; 
     }
-    #bookDetailsModal .modal-nav button:disabled { 
+    #bookDetailsModal .modal-nav button:disabled,
+    #prev-book-btn:disabled,
+    #next-book-btn:disabled,
+    #prev-book-btn[disabled],
+    #next-book-btn[disabled] { 
         background-color: #222 !important; 
         border-color: #222 !important; 
         opacity: 0.3 !important; 
+        color: #777 !important;
+    }
+    #prev-book-btn:hover:not([disabled]),
+    #next-book-btn:hover:not([disabled]) {
+        background-color: #444 !important;
     }
     #bookDetailsModal .close span { 
         color: #dddddd !important; 
@@ -1218,6 +1233,39 @@ html.tablet-dark {
         border-right-color: #333 !important;
         border-bottom-color: #333 !important;
         border-color: #333 !important;
+    }
+
+    /* 10.5 Modal Specifics */
+    body #bookDetailsModal .modal-nav button,
+    body #prev-book-btn,
+    body #next-book-btn { 
+        background-color: #333 !important; 
+        border-color: #444 !important; 
+        color: #dddddd !important;
+        text-shadow: none !important;
+    }
+    body #bookDetailsModal .modal-nav button span,
+    body #prev-book-btn span,
+    body #next-book-btn span { 
+        color: #dddddd !important; 
+    }
+    body #bookDetailsModal .modal-nav button:disabled,
+    body #prev-book-btn:disabled,
+    body #next-book-btn:disabled,
+    body #prev-book-btn[disabled],
+    body #next-book-btn[disabled] { 
+        background-color: #222 !important; 
+        border-color: #222 !important; 
+        opacity: 0.3 !important; 
+        color: #777 !important;
+    }
+    body #prev-book-btn:hover:not([disabled]),
+    body #next-book-btn:hover:not([disabled]) {
+        background-color: #444 !important;
+    }
+    body #bookDetailsModal .close span, body .close-icon { 
+        color: #dddddd !important; 
+        text-shadow: none !important; 
     }
 
     /* 11. Global Dark Scrollbars */
@@ -1543,4 +1591,198 @@ body.eink-mode .navigation li.active > a {
 }
 body.eink-mode .navbar-default, body.eink-mode .sticky-header {
     border-bottom: 2px solid #000000 !important;
+}
+
+/* Fix for dark book title in modal */
+#bookDetailsModal #title {
+    color: #dddddd !important;
+}
+
+/* Styles from index.html */
+.cr-scroller::-webkit-scrollbar { display: none; }
+.cr-scroller { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* FLEXBOX BLOWOUT FIX */
+.cr-book.session { max-width: 130px; }
+
+/* Main grid covers */
+.book.session .cover {
+    margin-bottom: 12px !important; 
+    position: relative !important;
+    width: 100%;
+}
+
+/* Currently Reading side-scroller covers */
+.cr-book.session .cover {
+    margin-bottom: 2px !important;
+    position: relative !important;
+    width: 100%;
+    height: auto !important; /* <-- THIS KILLS THE 225px GLOBAL HEIGHT */
+    min-height: 0 !important;
+}
+
+.book.session .cover .img, .cr-book.session .cover .img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 2 / 2.8; 
+    background-color: #f4f4f4; 
+    border-radius: 4px;
+    position: relative;
+    z-index: 1; 
+    overflow: hidden; 
+}
+
+.book.session .cover .img img, .cr-book.session .cover .img img,
+.book.session .cover .img picture, .cr-book.session .cover .img picture {
+    display: block; 
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    border-radius: inherit;
+    object-fit: cover; 
+}
+
+.book.session.is-stack .img, .cr-book.session.is-stack .img {
+    border: none; 
+    margin-bottom: 8px; 
+    margin-right: 8px;
+    box-shadow:
+        4px 4px 0 0px #cccccc,
+        8px 8px 0 0px #e6e6e6;
+}
+
+body { overflow-y: hidden !important; }
+
+.book.session, .cr-book.session { 
+    cursor: pointer; 
+    margin-bottom: 25px; 
+}
+
+@media (min-width: 768px) {
+    .browse-books { margin-top: 85px !important; height: calc(100vh - 150px) !important; overflow-y: auto; }
+}
+
+.read-overlay {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.4);
+    font-weight: bold; font-size: 13px;
+    text-transform: uppercase;
+    pointer-events: none; z-index: 10;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+.read-book-dimmed img { 
+    opacity: 0.6; 
+    filter: grayscale(100%); 
+    transition: filter 0.3s ease, opacity 0.3s ease; 
+}
+.read-book-dimmed:hover img { 
+    opacity: 1.0; 
+    filter: grayscale(0%); 
+}
+
+.wishlist-overlay {
+    position: absolute;
+    top: 6px; left: 6px;
+    width: 30px; height: 30px;
+    background: #fff;
+    border-radius: 50%;
+    border: 1px solid #ccc;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 15; 
+    pointer-events: none;
+}
+.wishlist-overlay .glyphicon { color: #d9534f; font-size: 17px; top: 1px; }
+
+@media (max-width: 991px) {
+    #sidebar { width: 25% !important; float: left !important; display: block !important; padding-right: 10px !important; }
+    #sidebar + div, #sidebar + .col-sm-9 { width: 75% !important; float: left !important; display: block !important; }
+}
+
+.gear-btn {
+    padding: 15px 20px !important;  
+    margin: -10px -15px !important; 
+    cursor: pointer;
+    display: inline-block;
+}
+
+.gear-btn .glyphicon-cog {
+    font-size: 22px !important;     
+    vertical-align: middle;
+    color: #555;                    
+}
+/* 1. Outrank style.css but leave a 12px gap at the top for the red X */
+.container-fluid .cr-book.book.session {
+    margin-top: 12px !important; /* <-- Pushes the book down so the X doesn't clip */
+    margin-bottom: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+}
+
+/* 2. Cap the scroller, but add 15px to max-height to compensate for the top margin */
+.cr-scroller {
+    height: auto !important;
+    max-height: 330px !important; /* Bumped up from 315px to fit the new top margin */
+    min-height: 0 !important;
+}
+
+/* BULK EDIT STYLES */
+#bulk-action-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: #fff; padding: 10px; z-index: 2000; display: none; box-shadow: 0 -2px 10px rgba(0,0,0,0.3); }
+#bulk-action-bar .dropdown-menu { top: auto; bottom: 100%; margin-bottom: 2px; }
+.bulk-mode .sticky-header { background-color: #333 !important; color: #fff !important; border-bottom: 1px solid #555; }
+.bulk-mode .sticky-header h2, .bulk-mode .sticky-header small { color: #fff !important; }
+.bulk-mode .sticky-header .dropdown-toggle { color: #333 !important; background-color: #fff; border-color: #ccc; }
+#bulk-process-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 3000; display: none; align-items: center; justify-content: center; flex-direction: column; color: #fff; }
+.processing-box { width: 80%; max-width: 400px; text-align: center; }
+.bulk-mode .book.session { cursor: crosshair; }
+.bulk-mode .cover a { pointer-events: none; }
+.bulk-mode .cover { transition: transform 0.2s; }
+.bulk-mode .book.selected .cover { transform: scale(0.92); box-shadow: 0 0 0 4px #007bff; border-radius: 4px; }
+.bulk-select-overlay { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; color: #007bff; text-shadow: 0 2px 4px rgba(255,255,255,0.8); z-index: 20; pointer-events: none; }
+.book.selected .bulk-select-overlay { display: block; }
+
+/* Hide the gear menu entirely while in Bulk Edit mode */
+.bulk-mode .header-top .dropdown { display: none !important; }
+
+/* USER RATING PILL */
+.user-rating-pill {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.75);
+    color: #ffff00; /* Star color */
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    line-height: 1.2;
+    letter-spacing: 1px;
+    pointer-events: none;
+    z-index: 15;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+.user-rating-pill .star-dot { 
+    color: #888; 
+    font-size: 10px; 
+    vertical-align: middle; 
+    margin: 0 1px;
+    position: relative;
+    top: -1px; /* Nudges the dot up to perfectly align with the stars */
+}
+
+.modal-nav-container {
+    position: absolute;
+    left: 20px;
+    top: 12px;
+    z-index: 999;
+    display: flex;
+    gap: 8px;
 }

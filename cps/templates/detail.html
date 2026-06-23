@@ -23,21 +23,9 @@
             if ($prevBtn.length > 0) {
                 clearInterval(checkExist); 
                 
-                // 1. Calculate URLs manually
-                var bookIds = [];
-                var urls = [];
-                $('.cover[data-book-id]').filter(function() {
-                    return $(this).closest('.carousel, .swiper, .scroller, [id*="carousel"]').length === 0;
-                }).each(function() {
-                    var $a = $(this).find('a[data-toggle="modal"]');
-                    if ($a.length > 0) {
-                        var id = parseInt($(this).data('book-id'));
-                        if (!isNaN(id) && bookIds.indexOf(id) === -1) {
-                            bookIds.push(id);
-                            urls.push($a.attr('href'));
-                        }
-                    }
-                });
+                // 1. Read the pre-computed global gallery
+                var bookIds = window.currentModalGallery ? window.currentModalGallery.ids : [];
+                var urls = window.currentModalGallery ? window.currentModalGallery.urls : [];
 
                 // 2. Enable buttons
                 var currentIndex = bookIds.indexOf(bookId);
@@ -63,6 +51,12 @@
                             success: function(response) { $modalContent.html(response); }
                         });
                     }
+                });
+
+                // GUARANTEE MODAL CLEARANCE ON CLOSE (Fixes the Caching Bug)
+                $('#bookDetailsModal').off('hidden.bs.modal.immortal').on('hidden.bs.modal.immortal', function () {
+                    $(this).removeData('bs.modal');
+                    $(this).find('.modal-content').html('<div class="modal-header"><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button><h4 class="modal-title" id="bookDetailsModalLabel">{{_("Book Details")}}</h4></div><div class="modal-body">...</div><div class="modal-footer"><button type="button" id="details_close" class="btn btn-default" data-dismiss="modal">{{_("Close")}}</button></div>');
                 });
 
                 // 4. Arm Native Keyboard
@@ -103,18 +97,18 @@
 
 <div class="single" style="height: 100%; padding: 45px 20px 20px 20px; box-sizing: border-box; position: relative; width: 100%;">
     
-    <div class="modal-nav" style="position: absolute; left: 20px; top: 12px; z-index: 999; display: flex; gap: 8px;">
+    <div class="modal-nav modal-nav-container">
         <button id="prev-book-btn" class="btn btn-default btn-sm" disabled title="{{ _('Previous Book') }}" style="border-radius: 4px; outline: none; padding: 4px 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <span class="glyphicon glyphicon-chevron-left" style="color: #555;"></span>
+            <span class="glyphicon glyphicon-chevron-left"></span>
         </button>
         <button id="next-book-btn" class="btn btn-default btn-sm" disabled title="{{ _('Next Book') }}" style="border-radius: 4px; outline: none; padding: 4px 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <span class="glyphicon glyphicon-chevron-right" style="color: #555;"></span>
+            <span class="glyphicon glyphicon-chevron-right"></span>
         </button>
     </div>
 
     <button type="button" class="close" data-dismiss="modal" aria-label="Close" 
             style="position: absolute; right: 15px; top: 10px; z-index: 999; opacity: 1; outline: none;">
-        <span aria-hidden="true" style="font-size: 30px; color: #555; text-shadow: 0 1px 0 #fff;">&times;</span>
+        <span aria-hidden="true" class="close-icon" style="font-size: 30px;">&times;</span>
     </button>
 
     <div class="row" style="height: 100%; display: flex; flex-wrap: nowrap;">
@@ -378,75 +372,26 @@
             window.setupClickTracker = true;
         }
 
-        var hideButtons = false;
-
-        // Check if the last thing clicked was inside a carousel/scroller
-        if (window.lastClickTarget) {
-            if ($(window.lastClickTarget).closest('.carousel, .swiper, .scroller, [id*="carousel"]').length > 0) {
-                hideButtons = true;
-            }
-        }
-
         // --- 2. APPLY LOGIC ---
-        if (hideButtons) {
-            // Safely hide the buttons if opened from a carousel
+        // Read the pre-computed global gallery from layout.html
+        var bookIds = window.currentModalGallery ? window.currentModalGallery.ids : [];
+        var urls = window.currentModalGallery ? window.currentModalGallery.urls : [];
+
+        var currentIndex = bookIds.indexOf(bookId);
+
+        if (currentIndex === -1) {
             $('.modal-nav').css('display', 'none');
         } else {
-            var bookIds = [];
-            var urls = [];
-            
-            // Safely filter out the carousel items and build the main grid array
-            $('.cover[data-book-id]').filter(function() {
-                return $(this).closest('.carousel, .swiper, .scroller, [id*="carousel"]').length === 0;
-            }).each(function() {
-                var $a = $(this).find('a[data-toggle="modal"]');
-                if ($a.length > 0) {
-                    var id = parseInt($(this).data('book-id'));
-                    if (!isNaN(id) && bookIds.indexOf(id) === -1) {
-                        bookIds.push(id);
-                        urls.push($a.attr('href'));
-                    }
-                }
-            });
-
-            var currentIndex = bookIds.indexOf(bookId);
-
-            if (currentIndex === -1) {
-                $('.modal-nav').css('display', 'none');
-            } else {
-                // Activate buttons only if there is a valid previous/next book
-                if (currentIndex > 0) {
-                    $('#prev-book-btn').prop('disabled', false).data('url', urls[currentIndex - 1]);
-                }
-                if (currentIndex < bookIds.length - 1) {
-                    $('#next-book-btn').prop('disabled', false).data('url', urls[currentIndex + 1]);
-                }
+            // Activate buttons only if there is a valid previous/next book
+            if (currentIndex > 0) {
+                $('#prev-book-btn').prop('disabled', false).data('url', urls[currentIndex - 1]);
+            }
+            if (currentIndex < bookIds.length - 1) {
+                $('#next-book-btn').prop('disabled', false).data('url', urls[currentIndex + 1]);
             }
         }
 
-        $('#prev-book-btn, #next-book-btn').on('click', function(e) {
-            e.preventDefault();
-            var targetUrl = $(this).data('url');
-            if (targetUrl) {
-                var $modalContent = $('#bookDetailsModal .modal-content');
-                if ($modalContent.length === 0) $modalContent = $(this).closest('.modal-content');
-                
-                $modalContent.html('<div class="text-center" style="padding: 100px;"><div class="spinner-blue"></div><h3 style="margin-top:20px; color:#333;">Loading...</h3></div>');
-                
-                $.ajax({
-                    url: targetUrl,
-                    type: 'GET',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                    success: function(response) {
-                        $modalContent.html(response);
-                    },
-                    error: function() {
-                        alert("Error loading book details.");
-                        $('#bookDetailsModal').modal('hide');
-                    }
-                });
-            }
-        });
+        // Removed redundant next/prev click listener that conflicts with Immortal script
 
         $('.download-btn').on('click', function(e) {
             var size = parseInt($(this).data('size')) || 0;
