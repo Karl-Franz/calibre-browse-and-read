@@ -1249,7 +1249,7 @@ def render_archived_books(page, sort_param):
 @web.route('/page/<int:page>')
 @login_required_if_no_ano
 def index(page):
-    return redirect(url_for('web.category_list'))
+    return redirect(url_for('web.books_list', data='newest', sort_param='stored'))
 
 
 @web.route('/<data>/<sort_param>', defaults={'page': 1, 'book_id': 1})
