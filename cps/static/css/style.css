@@ -127,27 +127,48 @@ table .bg-dark-danger a { color: #fff; }
 }
 
 /* FIX: Alert Banner Positioning & Modern Styling */
-    .row-fluid.text-center {
-        margin-top: 15px; 
-        margin-bottom: 10px;
-        position: relative;
-        z-index: 1000;
+    .flash-messages-container {
+        position: fixed;
+        top: 120px; /* Floats safely below the sticky header */
+        left: 0;
+        right: 0;
+        z-index: 9999;
+        pointer-events: none; /* Lets you click through the invisible container box */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
     }
 
-    .row-fluid.text-center .alert {
+    .flash-messages-container .alert {
+        pointer-events: auto; 
         border-radius: 6px;
         border: none;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-        color: #ffffff !important; /* Force white text for high contrast */
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        color: #ffffff !important; 
         font-weight: 600;
         text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        margin: 0; 
+        padding: 10px 25px;
+        min-width: 300px;
+        text-align: center;
+        
+        /* The Ghost Fade Animation */
+        animation: toastFadeOut 4s forwards;
     }
     
     /* Custom, saturated theme colors replacing the pale Bootstrap defaults */
-    .row-fluid.text-center .alert-success { background-color: #45b29d !important; } /* Theme Green */
-    .row-fluid.text-center .alert-info    { background-color: #337ab7 !important; } /* Theme Blue */
-    .row-fluid.text-center .alert-warning { background-color: #e67e22 !important; } /* Saturated Orange */
-    .row-fluid.text-center .alert-danger  { background-color: #d9534f !important; } /* Theme Red */
+    .flash-messages-container .alert-success { background-color: #45b29d !important; } 
+    .flash-messages-container .alert-info    { background-color: #337ab7 !important; } 
+    .flash-messages-container .alert-warning { background-color: #e67e22 !important; } 
+    .flash-messages-container .alert-danger  { background-color: #d9534f !important; } 
+
+    @keyframes toastFadeOut {
+        0% { opacity: 0; transform: translateY(-10px); }
+        5% { opacity: 1; transform: translateY(0); }
+        80% { opacity: 1; transform: translateY(0); } /* Stays solid for ~3 seconds */
+        100% { opacity: 0; transform: translateY(-10px); visibility: hidden; } /* Fades and locks out */
+    }
 
 .container-fluid img {
   display: block;
