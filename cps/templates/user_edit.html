@@ -57,17 +57,17 @@
             <option value="2" {% if content.theme == 2 or content.theme == None %}selected{% endif %}>{{ _('Auto (OS)') }}</option>
         </select>
     </div>
-    {% if registered_oauth.keys()| length > 0 and not new_user and profile %}
+    {% if not new_user and profile and registered_oauth and registered_oauth.keys()|length > 0 %}
       {% for id, name in registered_oauth.items() %}
-    <div class="form-group">
-      <label>{{ name }} {{_('OAuth Settings')}}</label>
-        {% if id not in oauth_status %}
-        <a href="{{ url_for('oauth.'+ name +'_login') }}" id="config_{{ id }}_oauth" class="btn btn-primary">{{_('Link')}}</a>
-        {% else %}
-        <a href="{{ url_for('oauth.'+ name +'_login_unlink') }}" id="config_{{ id }}_oauth" class="btn btn-primary">{{_('Unlink')}}</a>
-        {% endif %}
+      <div class="form-group">
+        <label>{{ name }} {{_('OAuth Settings')}}</label>
+          {% if id not in oauth_status %}
+          <a href="{{ url_for('oauth.'+ name +'_login') }}" id="config_{{ id }}_oauth" class="btn btn-primary">{{_('Link')}}</a>
+          {% else %}
+          <a href="{{ url_for('oauth.'+ name +'_login_unlink') }}" id="config_{{ id }}_oauth" class="btn btn-primary">{{_('Unlink')}}</a>
+          {% endif %}
+      </div>
       {% endfor %}
-    </div>
     {% endif %}
     {% if kobo_support and not new_user %}
     <label>{{ _('Kobo Sync Token')}}</label>
@@ -102,7 +102,7 @@
             <label for="Show_detail_random">{{_('Show Random Books in Detail View')}}</label>
         </div>
         <div class="col-sm-6 form-group">
-            <input type="checkbox" name="hide_reading" id="hide_reading" {% if content.get_view_property('privacy', 'hide_reading') %}checked{% endif %}>
+            <input type="checkbox" name="hide_reading" id="hide_reading" {% if not new_user and content.get_view_property('privacy', 'hide_reading') %}checked{% endif %}>
             <label for="hide_reading">{{_('Keep Reading Activity Private')}}</label>
         </div>
 
