@@ -465,15 +465,37 @@ input.pill:not(:checked) + label .glyphicon { display: none; }
   overflow-y: auto;
 }
 
+/* ==========================================================================
+   LOG VIEWER PERFECT FIT (Dynamic Flexbox Layout)
+   ========================================================================== */
+body:has(div.log) {
+    overflow: hidden !important; /* Hard lock the body scrollbar */
+    margin-bottom: 0 !important; /* Remove standard page footer margin */
+}
+
+body:has(div.log) .col-sm-10 {
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100vh - 50px - env(safe-area-inset-top)) !important;
+    padding-bottom: 20px !important;
+}
+
+body:has(div.log) #log_group,
+body:has(div.log) .col-sm-10 > .row {
+    flex-shrink: 0 !important; /* Prevents the buttons from squishing */
+}
+
 div.log {
   font-family: Courier New, serif;
   font-size: 12px;
   box-sizing: border-box;
-  height: 700px;
-  overflow-y: scroll;
+  height: calc(100vh - 280px); /* Safe fallback for older browsers */
+  flex-grow: 1 !important; /* Forces the log to stretch and fill all remaining space */
+  overflow: auto !important; /* Enables independent vertical and horizontal scrolling */
   border: 1px solid #ddd;
   white-space: nowrap;
   padding: 0.5em;
+  margin-top: 15px;
 }
 
 #detailcover { cursor:zoom-in; }
@@ -523,6 +545,7 @@ body {
         left: 0 !important;
         width: 190px !important;  /* HARD LIMIT: Never grows wider than this */
         overflow-y: auto !important;
+        overscroll-behavior: contain !important; /* Prevents scroll chaining to the main page */
         background-color: #f8f9fa !important;
         border-right: 1px solid #dee2e6 !important;
         padding-top: 15px !important;
@@ -725,20 +748,12 @@ body {
         background-color: #f2f2f2;
     }
 
-    /* 2. BASELINE: Short Header (No Pagination) 
-       Applied to BOTH Shelf and Browse pages.
-       Margin: 55px (Tight)
-       Height: 100vh - 120px */
+    /* 2. Natural Body Scrolling (No locked heights) */
     .shelf-books, .browse-books {
-        margin-top: 55px !important;
-        height: calc(100vh - 120px) !important; 
-        overflow-y: auto !important;
-        padding-bottom: 20px !important;
-    }
-
-    /* 3. Hide Body Scrollbar */
-    body.shelf, body.index {
-        overflow-y: hidden !important;
+        margin-top: 85px !important;
+        height: auto !important; 
+        overflow: visible !important;
+        padding-bottom: 40px !important;
     }
 }
 
@@ -1548,10 +1563,7 @@ body > .container-fluid,
         overflow-x: clip !important;
         max-width: 100vw !important;
     }
-    .browse-books {
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-    }
+    /* browse-books now natively flows with the body */
 }
 /* Fallback for older Safari on Mac */
 @supports not (overflow-x: clip) {
@@ -1583,40 +1595,69 @@ body > .container-fluid,
 }
 
 /* --- E-INK MODE --- */
-body.eink-mode, body.eink-mode * {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    box-shadow: none !important;
-    text-shadow: none !important;
-    transition: none !important; /* Disables all animations */
+/* 1. Universal Grayscale & Animation Killer */
+html:has(body.eink-mode) {
+    filter: grayscale(100%) !important; 
 }
-body.eink-mode img, body.eink-mode .cover .img {
-    filter: grayscale(100%) contrast(120%) !important; /* Punches up contrast for e-ink */
+body.eink-mode * {
+    transition: none !important; 
+    box-shadow: none !important; /* Flatten UI to reduce e-ink ghosting */
 }
-body.eink-mode .book .cover .img, body.eink-mode .form-control, body.eink-mode .btn {
-    border: 2px solid #000000 !important;
+
+/* 2. Form Controls & Geometry */
+body.eink-mode .form-control, 
+body.eink-mode .btn {
     border-radius: 0 !important; /* Sharp corners render cleaner on e-ink */
 }
-/* Removed .navigation li.active > a to drop the black box */
-body.eink-mode .btn-primary, body.eink-mode .pagination > li.active > a {
-    background-color: #000000 !important;
-    color: #ffffff !important;
-    border-color: #000000 !important;
+
+/* 3. Strip Blue/Accent colors natively using CSS variables and accent-color */
+body.eink-mode input[type="range"],
+body.eink-mode input[type="checkbox"] {
+    accent-color: #666666 !important;
+}
+body.eink-mode input[type="range"]::-webkit-slider-thumb {
+    background-color: #666666 !important;
+}
+body.eink-mode input[type="range"]::-moz-range-thumb {
+    background-color: #666666 !important;
 }
 
-/* Just make the active sidebar item bold instead */
-body.eink-mode .navigation li.active > a {
-    background-color: transparent !important;
+/* 4. Contrast & Borders - E-Ink Light Mode */
+body.eink-mode:not(.tablet-dark) .book .cover .img, 
+body.eink-mode:not(.tablet-dark) .form-control, 
+body.eink-mode:not(.tablet-dark) .btn {
+    border: 2px solid #666666 !important; /* High contrast grey (not stark black) */
+}
+body.eink-mode:not(.tablet-dark) .navbar-default, 
+body.eink-mode:not(.tablet-dark) .sticky-header {
+    border-bottom: 2px solid #666666 !important;
+}
+body.eink-mode:not(.tablet-dark) .navigation li.active > a {
+    background-color: #e0e0e0 !important;
+    font-weight: bold !important;
+}
+
+/* 5. Contrast & Borders - E-Ink Dark Mode */
+html.tablet-dark body.eink-mode .book .cover .img, 
+html.tablet-dark body.eink-mode .form-control, 
+html.tablet-dark body.eink-mode .btn {
+    border: 2px solid #888888 !important; /* Mid-grey to not blow out to full white */
+}
+html.tablet-dark body.eink-mode .navbar-default, 
+html.tablet-dark body.eink-mode .sticky-header {
+    border-bottom: 2px solid #888888 !important;
+}
+html.tablet-dark body.eink-mode .navigation li.active > a {
+    background-color: #333333 !important;
+    font-weight: bold !important;
+}
+
+/* Force dark text in E-Ink mode on iPad to combat OS dark mode overrides */
+body.eink-mode #bookDetailsModal #title,
+body.eink-mode #bookDetailsModal .single .author,
+body.eink-mode #bookDetailsModal .single .author a,
+body.eink-mode #bookDetailsModal .single h4 {
     color: #000000 !important;
-    font-weight: 900 !important;
-}
-body.eink-mode .navbar-default, body.eink-mode .sticky-header {
-    border-bottom: 2px solid #000000 !important;
-}
-
-/* Fix for dark book title in modal */
-#bookDetailsModal #title {
-    color: #dddddd !important;
 }
 
 /* Styles from index.html */
@@ -1672,15 +1713,14 @@ body.eink-mode .navbar-default, body.eink-mode .sticky-header {
         8px 8px 0 0px #e6e6e6;
 }
 
-body { overflow-y: hidden !important; }
-
 .book.session, .cr-book.session { 
     cursor: pointer; 
     margin-bottom: 25px; 
 }
 
-@media (min-width: 768px) {
-    .browse-books { margin-top: 85px !important; height: calc(100vh - 150px) !important; overflow-y: auto; }
+/* Hide Redundant Bottom Pagination (Forces use of Sticky Header) */
+.discover > .text-center .pagination {
+    display: none !important;
 }
 
 .read-overlay {

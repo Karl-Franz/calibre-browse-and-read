@@ -43,14 +43,19 @@
             var themeMode = "{{ current_user.theme | default(2) }}"; 
             var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
             
-            // If Admin chose Dark (1), OR Admin chose Auto (2) and the OS is Dark
-            if (themeMode === "1" || (themeMode === "2" && prefersDark)) {
+            // Apply Dark Mode Native CSS variables
+            if (themeMode === "1" || themeMode === "4" || (themeMode === "2" && prefersDark)) {
                 document.documentElement.classList.add("tablet-dark");
+            }
+            
+            // Apply E-Ink Grayscale to the HTML Root to prevent Fixed Positioning blowouts
+            if (themeMode === "3" || themeMode === "4") {
+                document.documentElement.classList.add("eink-mode");
             }
         })();
     </script>
   </head>
-  <body class="{{ page }} {{ bodyClass }} {% if request.cookies.get('cw_eink_mode') == '1' %}eink-mode{% endif %}" data-text="{{_('Home')}}" data-textback="{{_('Back')}}">
+  <body class="{{ page }} {{ bodyClass }} {% if current_user.theme == 3 or current_user.theme == 4 %}eink-mode{% endif %}" data-text="{{_('Home')}}" data-textback="{{_('Back')}}">
     
     {% set wishlist_shelf = namespace(id=None) %}
     {% if current_user.is_authenticated %}
@@ -112,7 +117,8 @@
               
               <li class="dropdown"><a href="#" class="dropdown-toggle profileDrop" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" title="{{ current_user.name }}"><span class="glyphicon glyphicon-user"></span></a>
                 <ul class="dropdown-menu profileDropli">
-                    <li><a id="top_user" data-text="{{_('Account')}}" href="{{url_for('web.profile')}}" ><span class="glyphicon glyphicon-user"></span> <span class="hidden-sm">{{current_user.name}}</span></a></li>
+                    <li><a id="top_user" data-text="{{_('Account')}}" href="{{url_for('web.profile')}}" ><span class="glyphicon glyphicon-user"></span> <span class="hidden-sm">{{current_user.name}} {{_('Settings')}}</span></a></li>
+                    <li><a id="nav_about" href="{{url_for('about.stats')}}"><span class="glyphicon glyphicon-info-sign"></span> <span class="hidden-sm">{{_('About')}}</span></a></li>
                     {% if g.allow_registration and not current_user.is_authenticated %}
                     <li><a id="login" href="{{url_for('web.login')}}"><span class="glyphicon glyphicon-log-in"></span> {{_('Login')}}</a></li>
                     <li><a id="register" href="{{url_for('web.register')}}"><span class="glyphicon glyphicon-user"></span> {{_('Register')}}</a></li>
@@ -359,16 +365,6 @@
                   </li>
                 {% endif %}
               {% endfor %}
-
-                {% if not current_user.is_anonymous %}
-                   <li class="divider" style="border-top: 2px solid currentColor; opacity: 0.2; margin: 15px 10px; list-style: none;"></li>
-                   <li>
-                       <a href="#" id="toggle-eink-mode" style="color: inherit;">
-                           <span class="glyphicon glyphicon-{% if request.cookies.get('cw_eink_mode') == '1' %}check{% else %}unchecked{% endif %}"></span> {{_('E-Ink Mode')}}
-                       </a>
-                   </li>
-                   <li id="nav_about" {% if page == 'stat' %}class="active"{% endif %}><a href="{{url_for('about.stats')}}"><span class="glyphicon glyphicon-info-sign"></span> {{_('About')}}</a></li>
-                {% endif %}
               {% endif %}
 
             </ul>
@@ -502,13 +498,7 @@
                 return null;
             }
 
-            $('#toggle-eink-mode').click(function(e) {
-                e.preventDefault();
-                var current = getCookie('cw_eink_mode');
-                setCookie('cw_eink_mode', current === '1' ? '0' : '1', 365);
-                window.location.reload();
             });
-        });
         // --- DYNAMIC COVER ZOOM LOGIC (SERVER-SYNCED) ---
         var zoomSlider = document.getElementById('cover-zoom-slider');
         

@@ -55,6 +55,8 @@
             <option value="0" {% if content.theme == 0 %}selected{% endif %}>{{ _('Light') }}</option>
             <option value="1" {% if content.theme == 1 %}selected{% endif %}>{{ _('Dark') }}</option>
             <option value="2" {% if content.theme == 2 or content.theme == None %}selected{% endif %}>{{ _('Auto (OS)') }}</option>
+            <option value="3" {% if content.theme == 3 %}selected{% endif %}>{{ _('E-Ink Light') }}</option>
+            <option value="4" {% if content.theme == 4 %}selected{% endif %}>{{ _('E-Ink Dark') }}</option>
         </select>
     </div>
     {% if not new_user and profile and registered_oauth and registered_oauth.keys()|length > 0 %}
