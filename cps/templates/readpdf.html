@@ -393,6 +393,10 @@
         body.theme-dark .warning-box h3, body.theme-slate .warning-box h3 { color: #eee; }
         body.theme-dark .warning-box p, body.theme-slate .warning-box p { color: #aaa; }
         body.theme-dark #btn-warning-cancel, body.theme-slate #btn-warning-cancel { background: #444; color: #ddd; }
+
+        /* --- E-INK MODE (Inherited from Global Settings) --- */
+        html.eink-mode { filter: grayscale(100%) !important; }
+        html.eink-mode, html.eink-mode * { transition: none !important; box-shadow: none !important; }
     </style>
 </head>
 <body class="theme-light">
@@ -703,6 +707,11 @@
             if (readerSettings.layout === 'auto-even') readerSettings.layout = 'even';
 
             // --- THEME ENGINE ---
+            var globalTheme = parseInt("{{ current_user.theme | default(2) }}");
+            if (globalTheme === 3 || globalTheme === 4) {
+                document.documentElement.classList.add('eink-mode');
+            }
+
             function applyTheme() {
                 var activeTheme = readerSettings.theme;
                 if (activeTheme === 'auto') {
