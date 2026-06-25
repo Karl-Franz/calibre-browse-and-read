@@ -103,10 +103,37 @@
         {% if entries|length < 1 %}
             {{_('No Results Found')}} <small>{{_('Search Term:')}} {{adv_searchterm}}</small>
         {% else %}
+            {% set sort_text = "" %}
+            {% if order == 'abc' %}
+                {% if current_letter %}{% set sort_text = _(" Titles starting with '%(letter)s' (ascending)", letter=current_letter) %}{% else %}{% set sort_text = _(" [by ascending Title]") %}{% endif %}
+            {% elif order == 'zyx' %}
+                {% if current_letter %}{% set sort_text = _(" Titles starting with '%(letter)s' (descending)", letter=current_letter) %}{% else %}{% set sort_text = _(" [by descending Title]") %}{% endif %}
+            {% elif order == 'authaz' %}
+                {% if current_letter %}{% set sort_text = _(" Authors starting with '%(letter)s' (ascending)", letter=current_letter) %}{% else %}{% set sort_text = _(" [by ascending Author]") %}{% endif %}
+            {% elif order == 'authza' %}
+                {% if current_letter %}{% set sort_text = _(" Authors starting with '%(letter)s' (descending)", letter=current_letter) %}{% else %}{% set sort_text = _(" [by descending Author]") %}{% endif %}
+            {% elif order == 'pubnew' %}
+                {% set sort_text = _(" by Pub Date (newest first)") %}
+            {% elif order == 'pubold' %}
+                {% set sort_text = _(" by Pub Date (oldest first)") %}
+            {% elif order == 'new' %}
+                {% set sort_text = _(" by Date Added (newest first)") %}
+            {% elif order == 'old' %}
+                {% set sort_text = _(" by Date Added (oldest first)") %}
+            {% elif order == 'seriesasc' %}
+                {% set sort_text = _(" by Series Index (1-9)") %}
+            {% elif order == 'seriesdesc' %}
+                {% set sort_text = _(" by Series Index (9-1)") %}
+            {% elif order == 'hotdesc' %}
+                {% set sort_text = _(" by Popularity (most read)") %}
+            {% elif order == 'hotasc' %}
+                {% set sort_text = _(" by Popularity (least read)") %}
+            {% endif %}
+
             {% if page == 'category' %}
-                {{title.replace('.', '<span class="glyphicon glyphicon-chevron-right" style="font-size: 0.6em; margin: 0 4px; vertical-align: middle; position: relative; top: -1px;"></span>')|safe}}
+                {{title.replace('.', '<span class="glyphicon glyphicon-chevron-right" style="font-size: 0.6em; margin: 0 4px; vertical-align: middle; position: relative; top: -1px;"></span>')|safe}}{{ sort_text }}
             {% else %}
-                {{title}}
+                {% if title == 'Books' or title == _('Books') %}{% if order in ['authaz', 'authza'] and current_letter %}{{_('All Book')}}{% else %}{{_('All Books')}}{% endif %}{% else %}{{title}}{% endif %}{{ sort_text }}
             {% endif %}
             
             <small>
