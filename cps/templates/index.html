@@ -122,6 +122,21 @@
       </h2>
     </div>
 
+    {% if order in ['abc', 'zyx', 'authaz', 'authza'] and charlist %}
+    <div class="header-alpha" style="width: 100%; overflow-x: auto; white-space: nowrap; margin-bottom: 5px; -webkit-overflow-scrolling: touch;">
+        <ul class="pagination pagination-sm" style="margin: 0; display: inline-block;">
+            <li class="{% if not current_letter %}active{% endif %}">
+                <a href="{{ url_for('web.books_list', data=page, book_id=id, sort_param=order) }}">{{_('All')}}</a>
+            </li>
+            {% for char in charlist %}
+            <li class="{% if current_letter == char %}active{% endif %}">
+                <a href="{{ url_for('web.books_list', data=page, book_id=id, sort_param=order, letter=char) }}">{{ char }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
     <div class="header-bottom">
        {% if pagination and (pagination.has_next or pagination.has_prev) %}
            <div class="pagination" data-per-page="{{ pagination.per_page }}" data-total="{{ pagination.total_count }}" style="display: block; text-align: left; margin-top: 5px; margin-bottom: 0px;">

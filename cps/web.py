@@ -675,16 +675,35 @@ def render_books_list(data, sort_param, book_id, page):
 
         series_first = request.cookies.get('cw_series_first') == '1'
         stack = request.cookies.get('cw_stack_series', '1') == '1'
+        letter = request.args.get('letter')
 
         if series_first:
             sort_order = [db.Series.name == None, db.Series.name, db.Books.series_index] + list(order[0])
         else:
             sort_order = order[0]
 
+        # --- DYNAMIC ALPHABET FILTERING ---
+        letter_filter = True
+        char_list = []
+        if order[1] in ['abc', 'zyx']:
+            char_results = calibre_db.session.query(func.upper(func.substr(db.Books.sort, 1, 1)).label('char')).filter(calibre_db.common_filters()).group_by(func.upper(func.substr(db.Books.sort, 1, 1))).all()
+            char_list = sorted([r.char for r in char_results if r.char])
+            if letter:
+                letter_filter = db.Books.sort.ilike(f"{letter}%")
+        elif order[1] in ['authaz', 'authza']:
+            char_results = calibre_db.session.query(func.upper(func.substr(db.Authors.sort, 1, 1)).label('char')).join(db.books_authors_link).join(db.Books).filter(calibre_db.common_filters()).group_by(func.upper(func.substr(db.Authors.sort, 1, 1))).all()
+            char_list = sorted([r.char for r in char_results if r.char])
+            if letter:
+                letter_filter = db.Books.authors.any(db.Authors.sort.ilike(f"{letter}%"))
+
         if stack:
             query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
             query = query.outerjoin(db.books_series_link, db.books_series_link.c.book == db.Books.id).outerjoin(db.Series)
             query = query.filter(calibre_db.common_filters(True))
+            
+            # Apply the letter boundary before pagination counts
+            if letter_filter is not True:
+                query = query.filter(letter_filter)
             
             query = query.group_by(coalesce(db.Series.id, db.Books.id * -1))
             query = query.order_by(*sort_order)
@@ -707,7 +726,7 @@ def render_books_list(data, sort_param, book_id, page):
             else:
                 random = false()
         else:
-            entries, random, pagination = calibre_db.fill_indexpage(page, 0, db.Books, True, sort_order,
+            entries, random, pagination = calibre_db.fill_indexpage(page, 0, db.Books, letter_filter, sort_order,
                                                                     True, config.config_read_column,
                                                                     db.books_series_link,
                                                                     db.Books.id == db.books_series_link.c.book,
@@ -715,7 +734,8 @@ def render_books_list(data, sort_param, book_id, page):
 
         return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
                                      title=_("Books"), page=website, order=order[1],
-                                     currently_reading=currently_reading_books)
+                                     currently_reading=currently_reading_books, 
+                                     charlist=char_list, current_letter=letter)
 
 
 def render_rated_books(page, book_id, order):
