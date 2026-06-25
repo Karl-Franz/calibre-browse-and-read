@@ -670,7 +670,10 @@
 
             book.ready.then(function() {
                 setTimeout(function() {
-                    book.locations.generate(1600).then(function() {
+                    var locKey = "cw_locations_{{ bookid }}";
+                    var cachedLocations = localStorage.getItem(locKey);
+
+                    function finishLocationSetup() {
                         $('#progress-slider').prop('disabled', false).attr('title', 'Drag to scroll');
                         
                         var activeCfi = currentCfi;
@@ -689,8 +692,23 @@
                         // Engine is done! Trigger the lock check.
                         isLocationsGenerated = true;
                         checkAndHideOverlay();
-                        
-                    }).catch(function(err) {});
+                    }
+
+                    if (cachedLocations) {
+                        // INSTANT LOAD: Bypass the 60-second generation completely
+                        book.locations.load(cachedLocations);
+                        finishLocationSetup();
+                    } else {
+                        // FIRST TIME LOAD: Do the math, then cache it for next time
+                        book.locations.generate(1600).then(function() {
+                            try {
+                                localStorage.setItem(locKey, book.locations.save());
+                            } catch(e) {
+                                console.warn("Browser storage quota exceeded, skipping location cache.");
+                            }
+                            finishLocationSetup();
+                        }).catch(function(err) {});
+                    }
                 }, 500); 
             });
 
