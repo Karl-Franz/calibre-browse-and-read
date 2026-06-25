@@ -1489,6 +1489,7 @@ html.tablet-dark {
     /* 26. Range Slider Dark Mode Visibility */
     body input[type="range"] {
         -webkit-appearance: none !important;
+        appearance: none !important;
         background: transparent !important;
         accent-color: #45b29d !important; 
     }
@@ -1501,6 +1502,7 @@ html.tablet-dark {
     
     body input[type="range"]::-webkit-slider-thumb {
         -webkit-appearance: none !important;
+        appearance: none !important;
         height: 16px;
         width: 16px;
         background-color: #45b29d;
