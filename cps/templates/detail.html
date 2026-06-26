@@ -216,26 +216,28 @@
                     
                     {% if entry.series|length > 0 %}
                         <p><strong>{{ _('Series') }}:</strong> 
+                            <span style="opacity: 0.70;">
                             {% if entry.series_index|float > 0 %}
                                 {{ _("Book %(index)s of %(range)s", index=entry.series_index|formatfloat(2), range=(url_for('web.books_list', data='series', sort_param='stored', book_id=entry.series[0].id)|escapedlink(entry.series[0].name))|safe) }}
                             {% else %}
                                 <a href="{{ url_for('web.books_list', data='series', sort_param='stored', book_id=entry.series[0].id) }}">{{ entry.series[0].name }}</a>
                             {% endif %}
+                            </span>
                         </p>
                     {% endif %}
 
                     {% if entry.languages|length > 0 %}
-                        <p><strong>{{_('Language')}}:</strong> {% for language in entry.languages %}{{language.language_name}}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+                        <p><strong>{{_('Language')}}:</strong> <span style="opacity: 0.70;">{% for language in entry.languages %}{{language.language_name}}{% if not loop.last %}, {% endif %}{% endfor %}</span></p>
                     {% endif %}
 
                     {% if entry.pages %}
-                        <p><strong>{{ _('Page Count') }}:</strong> {{ entry.pages }}</p>
+                        <p><strong>{{ _('Page Count') }}:</strong> <span style="opacity: 0.70;">{{ entry.pages }}</span></p>
                     {% endif %}
 
                     {% if entry.data|length > 0 %}
                         <div style="margin-top: 10px; margin-bottom: 10px;">
                             <strong>{{ _('Available Formats') }}:</strong>
-                            <ul style="list-style-type: none; padding-left: 20px; margin: 0;">
+                            <ul style="list-style-type: none; padding-left: 20px; margin: 0; opacity: 0.70;">
                                 {% for format in entry.data %}
                                     <li style="margin-top: 2px;">{{ format.format|trim }}: {{ format.uncompressed_size|filesizeformat }}</li>
                                 {% endfor %}
@@ -244,11 +246,11 @@
                     {% endif %}
 
                     {% if entry.publishers|length > 0 %}
-                        <p><strong>{{ _('Publisher') }}:</strong> <a href="{{ url_for('web.books_list', data='publisher', sort_param='stored', book_id=entry.publishers[0].id ) }}">{{ entry.publishers[0].name }}</a></p>
+                        <p><strong>{{ _('Publisher') }}:</strong> <span><a href="{{ url_for('web.books_list', data='publisher', sort_param='stored', book_id=entry.publishers[0].id ) }}">{{ entry.publishers[0].name }}</a></span></p>
                     {% endif %}
                     
                     {% if (entry.pubdate|string)[:10] != '0101-01-01' %}
-                        <p><strong>{{ _('Published') }}:</strong> {{ entry.pubdate|formatdate }}</p>
+                        <p><strong>{{ _('Published') }}:</strong> <span style="opacity: 0.70;">{{ entry.pubdate|formatdate }}</span></p>
                     {% endif %}
 
                     {% if entry.tags|length > 0 %}
@@ -265,9 +267,11 @@
                             {% if entry['custom_column_' ~ c.id]|length > 0 %}
                                 <div class="real_custom_columns" style="margin-bottom: 5px;">
                                     <strong>{{ c.name }}:</strong>
+                                    <span style="opacity: 0.70;">
                                     {% for column in entry['custom_column_' ~ c.id] %}
                                         {% if c.datatype == 'rating' %}{{ (column.value / 2)|formatfloat }}{% elif c.datatype == 'bool' %}{% if column.value == true %}<span class="glyphicon glyphicon-ok"></span>{% else %}<span class="glyphicon glyphicon-remove"></span>{% endif %}{% else %}{{ column.value }}{% endif %}
                                     {% endfor %}
+                                    </span>
                                 </div>
                             {% endif %}
                         {% endfor %}

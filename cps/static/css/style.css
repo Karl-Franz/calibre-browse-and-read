@@ -1849,3 +1849,56 @@ body.eink-mode #bookDetailsModal .single h4 {
     display: flex;
     gap: 8px;
 }
+
+/* ==========================================================================
+   DEFINITIVE MODAL TEXT COLORS (4 Theme States)
+   Controls all paragraphs, labels, links, and headers inside the details modal
+   ========================================================================== */
+
+/* 1. STANDARD LIGHT MODE (Default - No special classes) */
+#bookDetailsModal .single #title,
+#bookDetailsModal .single h4,
+#bookDetailsModal .single p,
+#bookDetailsModal .single div,
+#bookDetailsModal .single label,
+#bookDetailsModal .single li,
+#bookDetailsModal .single strong,
+#bookDetailsModal .single a:not(.btn):not(.label) {
+    color: #333333 !important;
+}
+
+/* 2. E-INK LIGHT MODE (eink-mode is active, tablet-dark is NOT) */
+html:not(.tablet-dark) body.eink-mode #bookDetailsModal .single #title,
+html:not(.tablet-dark) body.eink-mode #bookDetailsModal .single h4,
+html:not(.tablet-dark) body.eink-mode #bookDetailsModal .single p,
+html:not(.tablet-dark) body.eink-mode #bookDetailsModal .single div,
+html:not(.tablet-dark) body.eink-mode #bookDetailsModal .single label,
+html:not(.tablet-dark) body.eink-mode #bookDetailsModal .single li,
+html:not(.tablet-dark) body.eink-mode #bookDetailsModal .single strong,
+html:not(.tablet-dark) body.eink-mode #bookDetailsModal .single a:not(.btn):not(.label) {
+    color: #000000 !important; /* Pure black for E-ink screens */
+}
+
+/* 3. STANDARD DARK MODE (tablet-dark is active, eink-mode is NOT) */
+html.tablet-dark body:not(.eink-mode) #bookDetailsModal .single #title,
+html.tablet-dark body:not(.eink-mode) #bookDetailsModal .single h4,
+html.tablet-dark body:not(.eink-mode) #bookDetailsModal .single p,
+html.tablet-dark body:not(.eink-mode) #bookDetailsModal .single div,
+html.tablet-dark body:not(.eink-mode) #bookDetailsModal .single label,
+html.tablet-dark body:not(.eink-mode) #bookDetailsModal .single li,
+html.tablet-dark body:not(.eink-mode) #bookDetailsModal .single strong,
+html.tablet-dark body:not(.eink-mode) #bookDetailsModal .single a:not(.btn):not(.label) {
+    color: #dddddd !important; /* Soft light grey */
+}
+
+/* 4. E-INK DARK MODE (Both tablet-dark AND eink-mode are active) */
+html.tablet-dark body.eink-mode #bookDetailsModal .single #title,
+html.tablet-dark body.eink-mode #bookDetailsModal .single h4,
+html.tablet-dark body.eink-mode #bookDetailsModal .single p,
+html.tablet-dark body.eink-mode #bookDetailsModal .single div,
+html.tablet-dark body.eink-mode #bookDetailsModal .single label,
+html.tablet-dark body.eink-mode #bookDetailsModal .single li,
+html.tablet-dark body.eink-mode #bookDetailsModal .single strong,
+html.tablet-dark body.eink-mode #bookDetailsModal .single a:not(.btn):not(.label) {
+    color: #ffffff !important; /* Pure white to maximize contrast on E-ink */
+}
