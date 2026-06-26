@@ -120,12 +120,6 @@ table .bg-dark-danger a { color: #fff; }
   text-align: center;
 }
 
-.row.display-flex {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start; /* Forces the grid to start at the left edge */
-}
-
 /* FIX: Alert Banner Positioning & Modern Styling */
     .flash-messages-container {
         position: fixed;
@@ -559,11 +553,6 @@ body {
         padding-top: 15px !important;
         padding-left: 15px !important;       /* Small gap so books don't touch the line */
     }
-
-    /* 3. GRID ALIGNMENT */
-    .row.display-flex {
-        justify-content: flex-start !important; /* Force books to start at the left */
-    }
 }
 
 /* ==========================================================================
@@ -655,14 +644,7 @@ body {
     text-overflow: ellipsis;
 }
 
-/* Gear Icon Styling */
-.sticky-header .gear-btn {
-    font-size: 18px;
-    color: #555;
-    cursor: pointer;
-    padding: 5px;
-    border-radius: 4px;
-}
+/* Gear Icon Hover State (Size/Padding controlled by global iPad overrides) */
 .sticky-header .gear-btn:hover {
     background-color: #e0e0e0;
     color: #333;
@@ -793,12 +775,6 @@ body {
    ========================================================================== */
 :root {
     --cover-zoom: 1.0;
-}
-
-/* 1. Ensure the parent row actually allows wrapping */
-body .row.display-flex {
-    display: flex !important;
-    flex-wrap: wrap !important;
 }
 
 /* 2. Crush Bootstrap's rigid column widths and force dynamic sizing */
@@ -1044,21 +1020,13 @@ body.index {
 
 /* --- DARK MODE OVERRIDES --- */
 @media (prefers-color-scheme: dark) {
-    #bookDetailsModal .single, 
-    #bookDetailsModal .single #title,
-    #bookDetailsModal .single h4[style*="color: #777"] { 
-        color: #dddddd !important; 
-    }
-    #bookDetailsModal .single .author, 
-    #bookDetailsModal .single .author a { 
-        color: #aaaaaa !important; 
-    }
     #bookDetailsModal .single div[style*="border-bottom: 1px solid #eee"],
     #bookDetailsModal .single div[style*="border-right: 1px solid #eee"],
     #bookDetailsModal .single div[style*="border-left: 1px solid #eee"],
     #bookDetailsModal .single hr {
         border-color: #333 !important;
     }
+
     #bookDetailsModal .modal-nav button,
     #prev-book-btn,
     #next-book-btn { 
@@ -1550,10 +1518,11 @@ body > .container-fluid,
     padding-right: 15px !important; 
 }
 
-/* 3. iOS Flex Wrap Fix */
-.row.display-flex {
+/* 3. Master Flexbox Grid Rules (Consolidated) */
+body .row.display-flex {
     display: flex !important;
     flex-wrap: wrap !important;
+    justify-content: flex-start !important; /* Force books to start at the left */
     width: 100% !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
@@ -1652,14 +1621,6 @@ html.tablet-dark body.eink-mode .sticky-header {
 html.tablet-dark body.eink-mode .navigation li.active > a {
     background-color: #333333 !important;
     font-weight: bold !important;
-}
-
-/* Force dark text in E-Ink mode on iPad to combat OS dark mode overrides */
-body.eink-mode #bookDetailsModal #title,
-body.eink-mode #bookDetailsModal .single .author,
-body.eink-mode #bookDetailsModal .single .author a,
-body.eink-mode #bookDetailsModal .single h4 {
-    color: #000000 !important;
 }
 
 /* Styles from index.html */
@@ -1769,18 +1730,6 @@ body.eink-mode #bookDetailsModal .single h4 {
     #sidebar + div, #sidebar + .col-sm-9 { width: 75% !important; float: left !important; display: block !important; }
 }
 
-.gear-btn {
-    padding: 15px 20px !important;  
-    margin: -10px -15px !important; 
-    cursor: pointer;
-    display: inline-block;
-}
-
-.gear-btn .glyphicon-cog {
-    font-size: 22px !important;     
-    vertical-align: middle;
-    color: #555;                    
-}
 /* 1. Outrank style.css but leave a 12px gap at the top for the red X */
 .container-fluid .cr-book.book.session {
     margin-top: 12px !important; /* <-- Pushes the book down so the X doesn't clip */
