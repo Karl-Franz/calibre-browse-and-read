@@ -23,7 +23,7 @@ vendor/
 # calibre-web
 *.db
 *.log
-cps/cache
+cps/cache/
 
 .idea/
 *.bak
@@ -54,3 +54,6 @@ access.log
 .venv/
 venv/
 env/
+
+# --- Docker Test Bed Exclusions ---
+docker_config/

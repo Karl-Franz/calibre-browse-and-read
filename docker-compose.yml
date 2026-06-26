@@ -1,0 +1,18 @@
+services:
+  cbr-testbed:
+    image: lscr.io/linuxserver/calibre-web:latest
+    container_name: cbr-testbed
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=America/New_York
+      - DOCKER_MODS=linuxserver/mods:universal-calibre
+    volumes:
+      - ./docker_config:/config
+      - ./cps:/app/calibre-web/cps 
+      # Maps your external Seagate drive to the container's internal /books folder
+      - "/Volumes/Seagate 3TB/Calibre Libraries/Main Library:/books"
+    ports:
+      # 8088 is the safe test port. 8083 is what the container expects natively.
+      - 8088:8083
+    restart: unless-stopped
