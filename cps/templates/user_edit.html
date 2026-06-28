@@ -101,7 +101,7 @@
         {% endfor %}
         <div class="col-sm-6 form-group">
             <input type="checkbox" name="Show_detail_random" id="Show_detail_random" {% if content.show_detail_random() %}checked{% endif %}>
-            <label for="Show_detail_random">{{_('Show Random Books in Detail View')}}</label>
+            <label for="Show_detail_random">{{_('Show Random Book Selection in All Books page')}}</label>
         </div>
         <div class="col-sm-6 form-group">
             <input type="checkbox" name="hide_reading" id="hide_reading" {% if not new_user and content.get_view_property('privacy', 'hide_reading') %}checked{% endif %}>

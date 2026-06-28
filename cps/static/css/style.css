@@ -1393,8 +1393,9 @@ html.tablet-dark {
         color: #ffffff !important;
     }
 
-    /* 20. Currently Reading Section Title */
-    body .currently-reading-section h2 {
+    /* 20. Currently Reading & Random Books Section Titles */
+    body .currently-reading-section h2,
+    body .random-books-section h2 {
         color: #dddddd !important;
     }
 
@@ -1850,4 +1851,11 @@ html.tablet-dark body.eink-mode #bookDetailsModal .single li,
 html.tablet-dark body.eink-mode #bookDetailsModal .single strong,
 html.tablet-dark body.eink-mode #bookDetailsModal .single a:not(.btn):not(.label) {
     color: #ffffff !important; /* Pure white to maximize contrast on E-ink */
+}
+
+/* ==========================================================================
+   DISCOVER SECTION REFRESH BUTTON
+   ========================================================================== */
+#btn-refresh-random {
+    transition: all 0.2s ease;
 }

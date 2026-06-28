@@ -80,8 +80,8 @@ class _Settings(_Base):
     config_trustedhosts = Column(String, default='')
     config_calibre_web_title = Column(String, default='Calibre Browse & Read')
     config_books_per_page = Column(Integer, default=100)
-    config_random_books = Column(Integer, default=4)
-    config_authors_max = Column(Integer, default=0)
+    config_random_books = Column(Integer, default=20)
+    config_authors_max = Column(Integer, default=2)
     config_read_column = Column(Integer, default=0)
     config_title_regex = Column(String,
                                 default=r'^(A|The|An|Der|Die|Das|Den|Ein|Eine'
