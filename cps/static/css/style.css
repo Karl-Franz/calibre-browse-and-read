@@ -780,7 +780,8 @@ body {
 /* 2. Crush Bootstrap's rigid column widths and force dynamic sizing */
 body .row.display-flex > .book,
 body .row.display-flex > div[class*="col-"],
-body .currently-reading-section .cr-book {
+body .currently-reading-section .cr-book,
+body .random-books-section .cr-book {
     /* Force the width to exactly match the slider math */
     width: calc(180px * var(--cover-zoom)) !important;
     flex: 0 0 calc(180px * var(--cover-zoom)) !important;
