@@ -57,3 +57,4 @@ env/
 
 # --- Docker Test Bed Exclusions ---
 docker_config/
+docker-compose.yml
